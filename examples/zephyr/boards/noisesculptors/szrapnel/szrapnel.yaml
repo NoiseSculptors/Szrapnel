@@ -1,0 +1,24 @@
+identifier: szrapnel 
+name: Szrapnel
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+supported:
+  - adc
+  - flash
+  - gpio
+  - i2c
+  - qspi
+  - rng
+  - rtc
+  - sdmmc
+  - timer
+  - uart
+  - usb_device
+  - watchdog
+ram: 1024
+flash: 128
+vendor: noisesculptors
+

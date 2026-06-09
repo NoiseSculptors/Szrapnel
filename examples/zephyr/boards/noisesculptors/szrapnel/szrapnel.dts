@@ -1,0 +1,252 @@
+/*
+ * Copyright (c) 2026, Kresimir Popovic
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+#include <st/h7/stm32h750Xb.dtsi>
+#include <st/h7/stm32h750vbtx-pinctrl.dtsi>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+	model = "Noise Sculptors Szrapnel";
+	compatible = "st,stm32h750vb";
+
+	chosen {
+		zephyr,console = &uart8;
+		zephyr,shell-uart = &uart8;
+		zephyr,sram = &sram0;
+		zephyr,flash = &flash0;
+		zephyr,flash-controller = &h25q32b;
+        zephyr,flash-disk = &flash_disk0;
+        zephyr,display = &st7735r_160x80;
+	};
+
+    /* needs -DCONFIG_STM32_MEMMAP=y */
+	ext_memory: memory@90000000 {
+		compatible = "zephyr,memory-region";
+		reg = <0x90000000 DT_SIZE_M(32)>;
+		zephyr,memory-region = "EXTMEM";
+		zephyr,memory-attr = <DT_MEM_ARM(ATTR_MPU_IO)>;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led_A: led_0 {
+			gpios = <&gpioe 11 GPIO_ACTIVE_HIGH>;
+			label = "LED0";
+		};
+
+		led_B: led_1 {
+			gpios = <&gpioe 12 GPIO_ACTIVE_HIGH>;
+			label = "LED1";
+		};
+
+		led_C: led_2 {
+			gpios = <&gpioe 13 GPIO_ACTIVE_HIGH>;
+			label = "LED2";
+		};
+
+	};
+
+	mipi_dbi {
+		compatible = "zephyr,mipi-dbi-spi";
+		spi-dev = <&spi2>;
+		reset-gpios = <&gpiod 8 GPIO_ACTIVE_LOW>;
+		dc-gpios = <&gpiod 9 GPIO_ACTIVE_HIGH>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		write-only;
+		status = "okay";
+
+		st7735r_160x80: st7735r@0 {
+			compatible = "sitronix,st7735r";
+			mipi-max-frequency = <24000000>;
+			mipi-mode = "MIPI_DBI_MODE_SPI_4WIRE";
+			reg = <0>;
+			width = <160>;
+			height = <80>;
+			x-offset = <0>;
+			y-offset = <24>;
+			madctl = <0x68>;
+			colmod = <0x05>;
+			invctr = <7>;
+			vmctr1 = <0x0e>;
+			pwctr1 = [a2 02 84];
+			pwctr2 = [c1];
+			pwctr3 = [0a 00];
+			pwctr4 = [8a 2a];
+			pwctr5 = [8a ee];
+			frmctr1 = [01 26 2e];
+			frmctr2 = [01 26 2e];
+			frmctr3 = [01 26 2e 01 26 2e];
+			gamctrp1 = [0f 1a 0f 18 2f 28 20 22 1f 1b 23 37 00 07 02 10];
+			gamctrn1 = [0f 1b 0f 17 33 2c 29 2e 30 2e 30 3b 00 07 03 10];
+			caset = [00 01 00 a0];
+			raset = [00 1a 00 69];
+		};
+	};
+
+	gpio_keys {
+		compatible = "gpio-keys";
+        /*
+        6x5 buttons
+        gpiod 13 | gpioc  8 | gpiob 10 | gpiob  4 | gpioc 13 | gpioc 15 |
+        gpiod 14 | gpioc  9 | gpioe 15 | gpioc  4 | gpioe  4 | gpioc 14 |
+        gpiod 15 | gpioa  8 | gpiob 11 | gpioc  5 | gpiod  7 | gpioe  6 |
+        gpioc  6 | gpioa 10 | gpioc 10 | gpiob  0 | gpiob  3 | gpioe  5 |
+        gpioc  7 | gpioa  9 | gpioa 15 | gpiob  1 | gpiod  6 | gpioe  3 |
+        */
+
+        /* zephyr/dt-bindings/input/input-event-codes.h */
+        /* left button */
+        button_1{gpios=<&gpiod 12 GPIO_ACTIVE_HIGH>;zephyr,code=<1>;label="INPUT_KEY_ESC";};
+        /* right buttons */
+        button_2{gpios=<&gpioc  1 GPIO_ACTIVE_HIGH>;zephyr,code=<2>;label="INPUT_KEY_1";};
+        button_3{gpios=<&gpioc  0 GPIO_ACTIVE_HIGH>;zephyr,code=<3>;label="INPUT_KEY_2";};
+    };
+
+
+    flash_disk0: flash_disk {
+        compatible = "zephyr,flash-disk";
+        partition = <&storage_partition>;
+        disk-name = "FLASH";
+        cache-size = <4096>;
+    };
+
+    /*
+    audio_codec: dummy_codec {
+		compatible = "audio-codec-dummy";
+		status = "okay";
+	};
+    */
+
+	aliases {
+		led0 = &led_A;
+		led1 = &led_B;
+		led2 = &led_C;
+        i2s-tx = &i2s1;
+		spi-flash0 = &h25q32b;
+		watchdog0 = &iwdg;
+	};
+};
+
+&pll {
+	div-m = <13>;
+	mul-n = <240>;
+	div-p = <1>;
+	div-q = <10>;
+	div-r = <2>;
+	clocks = <&clk_hse>;
+	status = "okay";
+};
+
+&pll2 {
+	div-m = <16>;
+	mul-n = <121>;
+	div-p = <2>;
+	div-q = <8>;
+	div-r = <8>;
+	clocks = <&clk_hse>;
+	status = "okay";
+};
+/*
+*/
+
+/* max:
+ SYSCLK 480MHz
+ AHB 240MHz
+ APBx 120MHz */
+&rcc {
+	clocks = <&pll>;
+	clock-frequency = <DT_FREQ_M(480)>;
+	d1cpre = <1>;
+	hpre = <2>;
+	d1ppre = <2>;
+	d2ppre1 = <2>;
+	d2ppre2 = <2>;
+	d3ppre = <2>;
+};
+
+&clk_hse {
+	clock-frequency = <DT_FREQ_M(26)>;
+    status = "okay";
+};
+
+&uart8 {
+	pinctrl-0 = <&uart8_tx_pe1 &uart8_rx_pe0>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+	status = "okay";
+};
+
+&iwdg1 {
+	status = "okay";
+};
+
+&dma1 {
+    status = "okay";
+};
+
+&dmamux1 {
+    status = "okay";
+};
+
+&i2s1 {
+	pinctrl-0 = <&i2s1_ws_pa4 &i2s1_ck_pa5 &i2s1_sdo_pa7>;
+	pinctrl-names = "default";
+    clocks = <&rcc STM32_CLOCK(APB2, 12)>, <&rcc STM32_SRC_PLL2_P SPI123_SEL(0)>;
+    status = "okay";
+};
+
+&pwr {
+	power-supply = "ldo";
+};
+
+&spi2 {
+    pinctrl-0 = <&spi2_sck_pb13 &spi2_mosi_pb15 &spi2_nss_pb12>;
+    pinctrl-names = "default";
+    status = "okay";
+};
+
+&quadspi_clk_pb2      { slew-rate = "medium-speed"; };
+&quadspi_bk2_ncs_pc11 { slew-rate = "medium-speed"; };
+&quadspi_bk2_io0_pe7  { slew-rate = "medium-speed"; };
+&quadspi_bk2_io1_pe8  { slew-rate = "medium-speed"; };
+&quadspi_bk2_io2_pe9  { slew-rate = "medium-speed"; };
+&quadspi_bk2_io3_pe10 { slew-rate = "medium-speed"; };
+
+&quadspi {
+	pinctrl-0 = <&quadspi_clk_pb2 &quadspi_bk2_ncs_pc11
+		     &quadspi_bk2_io0_pe7 &quadspi_bk2_io1_pe8
+		     &quadspi_bk2_io2_pe9 &quadspi_bk2_io3_pe10>;
+
+	pinctrl-names = "default";
+    flash-id = <2>;
+	status = "okay";
+
+	h25q32b: qspi-nor-flash@0 {
+		compatible = "st,stm32-qspi-nor";
+		reg = <0>;
+        size = <DT_SIZE_M(32)>; /* 32 Mbit */
+        qspi-max-frequency = <133000000>; /* max allowed, speed: ~48.8MiBps */
+        // qspi-max-frequency = <80000000>; /* speed: ~34.3MiBps */
+        spi-bus-width = <4>;
+		cs-high-time = <4>;
+        writeoc = "PP_1_4_4"; /* do not remove */
+		status = "okay";
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			storage_partition: partition@0 {
+				label = "storage";
+				reg = <0x0 DT_SIZE_M(4)>; /* 4MB, 32 Mbit */
+			};
+		};
+	};
+};
+

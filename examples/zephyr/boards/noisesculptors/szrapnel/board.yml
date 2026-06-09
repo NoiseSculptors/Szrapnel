@@ -1,0 +1,6 @@
+board:
+  name: szrapnel
+  full_name: Szrapnel
+  vendor: noisesculptors
+  socs:
+    - name: stm32h750xx
