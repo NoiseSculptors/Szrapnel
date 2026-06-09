@@ -239,7 +239,7 @@ void lcd_dma_send(uint8_t *arr, uint16_t n)
    g:1110000000000111 */
 uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b)
 {
-    return ((g & 0x1C) << 3 | (r >> 3)) << 8 | b & 0xF8 | g >> 5;
+    return ((g & 0x1C) << 3 | (r >> 3)) << 8 | (b & 0xF8) | g >> 5;
 }
 
 int lcd_printf(int x, int y, int xmul, int ymul,

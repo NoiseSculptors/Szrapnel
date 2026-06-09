@@ -2,16 +2,15 @@
 #ifndef USER_IO_H
 #define USER_IO_H
 
+#include "io_config.h"
 #include <stdint.h>
 #include <stddef.h>
-
-#define WIDTH   160 
-#define HEIGHT  80
 
 void io_init(void);
 void io_buttons_init(void);
 void io_encoders_init(void);
 void io_serial_init(void);
+void io_dac_init(void);
 
 typedef struct { uint16_t value;
                  int16_t delta;

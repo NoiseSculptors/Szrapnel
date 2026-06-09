@@ -5,6 +5,7 @@ project(app_io C)
 
 add_library(app_io STATIC
                               buttons.c
+                              dac.c
                               encoders.c
                               fonts/font_6x10.c
                               fonts/font_8x8.c
