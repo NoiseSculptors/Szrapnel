@@ -27,6 +27,11 @@ volatile uint32_t lcd_busy;
 extern uint8_t font_8x8_linux[256*8];
 extern uint8_t font_6x10_linux[256*8];
 
+uint16_t *lcd_get_fb(void)
+{
+    return fb;
+}
+
 void lcd_flush_fb(void)
 {
     static uint8_t ramwr[1] __attribute__((aligned(32))) = {0x2c}; // ramwr
@@ -75,11 +80,8 @@ void lcd_led_brightness(uint8_t pct)
 
 static void lcd_spi_init(void)
 {
-    /* pll2q to 247MHz, 123.5MHz SPI clock, jumper wires on calibrator750*/
-    // pll_2_start(PLLSRC_HSE, 2, 19, 0u, 1, 1, 128, 26000000u);
-
-    /* pll2q to 299MHz, 149.5MHz SPI clock, on Szrapnel*/
-    pll_2_start(PLLSRC_HSE, 2, 23, 0u, 1, 1, 128, 26000000u);
+    /* sharing the same PLL2_P with I2S/DAC */
+    pll_2_start(PLLSRC_HSE, 16, 181, 3968, 1, 128, 128, 26000000u);
 
     *RCC_D2CCIP1R &= ~(7u<<12);
     *RCC_D2CCIP1R |= (1u<<12); // PLL2Q as clock source for SPI123
@@ -130,7 +132,7 @@ static void lcd_init_dma(void){
 
 
 #define DELAY 1
-void lcd_init(void)
+void io_lcd_init(void)
 {
 
     fb1 = fb;
@@ -212,6 +214,7 @@ void lcd_init(void)
 
     lcd_command(0x29); delay_ms(20);    // DISPLAY ON
     delay_ms(DELAY);
+    lcd_led_brightness(100);
 }
 
 void lcd_dma_send(uint8_t *arr, uint16_t n)
@@ -347,3 +350,156 @@ void lcd_clear_flush(uint16_t color)
     lcd_flush_fb();
 }
 
+static inline void drawPixel(int x, int y, uint16_t color){
+    uint16_t pos = y*WIDTH + x;
+    fb[pos] = color;
+
+}
+
+#if 0
+void lcd_draw_waveform(
+    const int32_t* audio_buf,  // Interleaved L/R int32_t audio buffer
+    int32_t audio_samples      // Total number of stereo frames in buffer
+)
+{
+    uint16_t fg = rgb565(0,255,255);   // Waveform color
+    uint16_t bg = rgb565(64,64,0);     // Background color
+
+    lcd_clear(bg);
+
+    // 1. Calculate layout boundaries (Horizontal split)
+    int32_t mid_y_l = HEIGHT / 4;           // Center Y for Left channel (top half)
+    int32_t mid_y_r = (3 * HEIGHT) / 4;     // Center Y for Right channel (bottom half)
+    int32_t max_amplitude = HEIGHT / 5;     // Maximum height of waveform
+
+    // 2. Fixed-point step size to map audio buffer to screen width
+    uint32_t fp_step = ((uint32_t)audio_samples << 16) / WIDTH;
+    uint32_t fp_index = 0;
+
+    for (int32_t x = 0; x < WIDTH; x++) {
+        int32_t sample_idx = fp_index >> 16;
+
+        // Interleaved int32_t stereo:
+        // [L0, R0, L1, R1, L2, R2, ...]
+        int32_t sample_l = audio_buf[sample_idx * 2];
+        int32_t sample_r = audio_buf[sample_idx * 2 + 1];
+
+        // Convert 32-bit signed samples to vertical amplitudes
+        int32_t h_l = (((sample_l >> 16) * max_amplitude) >> 15);
+        int32_t h_r = (((sample_r >> 16) * max_amplitude) >> 15);
+
+        // Left channel bounds
+        int32_t y_start_l = (h_l < 0) ? mid_y_l + h_l : mid_y_l;
+        int32_t y_end_l   = (h_l < 0) ? mid_y_l       : mid_y_l + h_l;
+
+        // Right channel bounds
+        int32_t y_start_r = (h_r < 0) ? mid_y_r + h_r : mid_y_r;
+        int32_t y_end_r   = (h_r < 0) ? mid_y_r       : mid_y_r + h_r;
+
+        // Draw Left channel column
+        if (y_start_l < 0) y_start_l = 0;
+        if (y_end_l >= HEIGHT) y_end_l = HEIGHT - 1;
+        uint16_t* pixel_ptr = &fb[y_start_l * WIDTH + x];
+        for (int32_t y = y_start_l; y <= y_end_l; y++) {
+            *pixel_ptr = fg;
+            pixel_ptr += WIDTH;
+        }
+
+        // Draw Right channel column
+        if (y_start_r < 0) y_start_r = 0;
+        if (y_end_r >= HEIGHT) y_end_r = HEIGHT - 1;
+        pixel_ptr = &fb[y_start_r * WIDTH + x];
+        for (int32_t y = y_start_r; y <= y_end_r; y++) {
+            *pixel_ptr = fg;
+            pixel_ptr += WIDTH;
+        }
+
+        fp_index += fp_step;
+    }
+
+    lcd_flush_fb();
+}
+#endif
+#if 1
+void lcd_draw_waveform(
+    const int32_t* audio_buf,   // Interleaved L/R signed 32-bit samples stored in uint32_t
+    int32_t audio_frames         // Number of stereo frames
+)
+{
+    const uint16_t fgL = rgb565(255, 255, 0);
+    const uint16_t fgR = rgb565(0, 255, 255);
+    const uint16_t bg = rgb565(0, 64, 0);
+
+    lcd_clear(bg);
+
+    const int32_t mid_y_l = HEIGHT / 4;
+    const int32_t mid_y_r = (3 * HEIGHT) / 4;
+    const int32_t max_amplitude = (HEIGHT / 4) - 2;  // bigger waveform
+
+    // Fixed-point step for mapping audio frames to screen width
+    const uint32_t fp_step = ((uint32_t)audio_frames << 16) / WIDTH;
+    uint32_t fp_index = 0;
+
+    for (int32_t x = 0; x < WIDTH; x++) {
+        const int32_t sample_idx = fp_index >> 16;
+
+        // Interleaved stereo: [L0, R0, L1, R1, ...]
+        const int32_t sample_l = (int32_t)audio_buf[sample_idx * 2];
+        const int32_t sample_r = (int32_t)audio_buf[sample_idx * 2 + 1];
+
+        // Fast scaling using upper 16 bits
+        const int32_t h_l = (((sample_l >> 16) * max_amplitude) >> 15);
+        const int32_t h_r = (((sample_r >> 16) * max_amplitude) >> 15);
+
+        const int32_t y_l = mid_y_l + h_l;
+        const int32_t y_r = mid_y_r + h_r;
+
+        if ((unsigned)y_l < (unsigned)HEIGHT) {
+            fb[y_l * WIDTH + x] = fgL;
+        }
+
+        if ((unsigned)y_r < (unsigned)HEIGHT) {
+            fb[y_r * WIDTH + x] = fgR;
+        }
+
+        fp_index += fp_step;
+    }
+
+}
+#endif
+#if 0
+void lcd_draw_waveform(
+    const int32_t* audio_buf,
+    int32_t audio_frames
+)
+{
+    const uint16_t fg = rgb565(0, 255, 255);
+    const uint16_t bg = rgb565(64, 64, 0);
+
+    lcd_clear(bg);
+
+    const int32_t mid_y_l = HEIGHT / 4;
+    const int32_t mid_y_r = (3 * HEIGHT) / 4;
+    const int32_t max_amplitude = (HEIGHT / 2) - 2;
+
+    const uint32_t fp_step = ((uint32_t)audio_frames << 16) / WIDTH;
+    uint32_t fp_index = 0;
+
+    for (int32_t x = 0; x < WIDTH; x++) {
+        const int32_t sample_idx = fp_index >> 16;
+
+        const int32_t sample_l = (int32_t)audio_buf[sample_idx * 2];
+        const int32_t sample_r = (int32_t)audio_buf[sample_idx * 2 + 1];
+
+        const int32_t h_l = (((sample_l >> 16) * max_amplitude) >> 15);
+        const int32_t h_r = (((sample_r >> 16) * max_amplitude) >> 15);
+
+        fb[(mid_y_l + h_l) * WIDTH + x] = fg;
+        fb[(mid_y_r + h_r) * WIDTH + x] = fg;
+
+        fp_index += fp_step;
+    }
+
+    lcd_flush_fb();
+}
+#endif

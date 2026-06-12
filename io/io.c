@@ -80,9 +80,12 @@ a15 | b4  |  c7  |  d14 | e6
 }
 
 void io_init(void) {
+    init_clock();
     init_rng();
     io_buttons_init();
     io_encoders_init();
     io_serial_init();
+    io_lcd_init();
+    io_dac_init();
 }
 

@@ -65,7 +65,7 @@ void io_encoders_init(void) {
     *TIM15_CNT = 1;
 }
 
-io_enc_sample_t io_enc_read(size_t idx)
+io_enc_t io_enc_read(size_t idx)
 {
     static int16_t last0, last1;
     int16_t now, d16;
@@ -86,6 +86,6 @@ io_enc_sample_t io_enc_read(size_t idx)
             break;
     }
 
-    return (io_enc_sample_t){ .value = now, .delta = d16, .pushed = 0 };
+    return (io_enc_t){ .value = now, .delta = d16, .pushed = 0 };
 }
 

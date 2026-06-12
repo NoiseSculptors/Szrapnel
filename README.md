@@ -1,64 +1,16 @@
 
-**Encoders**: `EC[1..2]`
-**Keys/Leds**: `01..30`
-**Keys**: `RST`, `DFU`, `A..C`
+# Szrapnel Open Synth Platform
 
-```
-                      EC1       EC2
+## What It Is
 
-                          RST   DFU
+Szrapnel is an open synth platform for people who like to build, hack, experiment, and explore sound through hardware and firmware.
 
-    01    02    03    04    05    06
+It is designed for **creative coders, synth hackers, experimental musicians, and embedded developers** who want a flexible tool they can learn from and shape over time.
 
-A   07    08    09    10    11    12   B
+Szrapnel is built to be open, practical, and hackable. It gives you a platform for signal generation, sound experiments, custom firmware, and hands-on exploration without forcing you into a closed workflow.
 
-    13    14    15    16    17    18   C
+In simple terms: it is a tool for people who want to make things, change things, and understand how they work.
 
-    19    20    21    22    23    24
-
-    25    26    27    28    29    30
-```
-
-## Keys
-
-|Key| GPIO | Key| GPIO | Key| GPIO |
-|:-:|------|:--:|------|:--:|------|
-|01 | D13  | 16 | C5   | A  | D12  |
-|02 | C8   | 17 | D7   | B  | C1   |
-|03 | B10  | 18 | E6   | C  | C0   |
-|04 | B4   | 19 | C6   |    |      |
-|05 | C13  | 20 | A10  |    |      |
-|06 | C15  | 21 | C10  |    |      |
-|07 | D14  | 22 | B0   |    |      |
-|08 | C9   | 23 | B3   |    |      |
-|09 | E15  | 24 | E5   |    |      |
-|10 | A6   | 25 | C7   |    |      |
-|11 | E4   | 26 | A9   |    |      |
-|12 | C14  | 27 | A15  |    |      |
-|13 | D15  | 28 | B1   |    |      |
-|14 | A8   | 29 | D6   |    |      |
-|15 | B11  | 30 | E3   |    |      |
-
-## LEDs, charlieplexed
-
-LEDS | GPIO 
-:---:|------
-  1  |  D0 
-  2  |  D1
-  3  |  D2
-  4  |  D3
-  5  |  D4
-  6  |  D5    
-
-## LCD
-
-LCD  | GPIO | Peripheral | AF
------|------|------------|----
-LED  | B14  |            |
-RST  | D8   |            |
-RS   | D9   |            |
-MOSI | B15  | SPI2_MOSI  | AF5
-SCK  | B13  | SPI2_SCK   | AF5
-EN   | D10  |            |
-CS   | B12  | SPI2_NSS   | AF5
-
+Open.
+Experimental.
+Built for makers, musicians, and curious programmers exploring sound and DSP.

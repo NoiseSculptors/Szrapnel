@@ -4,7 +4,7 @@
  * - Optional: small sanity check on PC (non-zero, Thumb).
  *
  * Configurable via -D defines from CMake:
- *   APP_BASE  : RAM app vector base (default 0x24000000 for H750 AXI; 0x20000000 for G0)
+ *   APP_BASE  : RAM app vector base (default 0x24000000 for H7 AXI)
  */
 
 .syntax unified

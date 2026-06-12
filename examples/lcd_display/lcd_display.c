@@ -21,7 +21,6 @@ static void init_hw(void)
 {
 	init_clock();
     io_init();
-    lcd_init();
     lcd_led_brightness(100);
     init_systick_1ms();
 }

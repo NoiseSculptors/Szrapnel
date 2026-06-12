@@ -29,7 +29,7 @@ int main(void) {
 //          printf("%032b\n",*GPIOA_IDR);
 //  }
 
-    io_enc_sample_t encoder0, encoder1;
+    io_enc_t encoder0, encoder1;
 
     while(1){
         static uint16_t tmp0,tmp1;

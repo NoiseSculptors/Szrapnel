@@ -1,13 +1,13 @@
 
 #include "init.h"
 #include "io.h"
+#include "delay.h"
 #include <stdint.h>
 
 static void init_hw(void)
 {
 	init_clock();
     io_init();
-    lcd_init();
     lcd_led_brightness(100);
 }
 
