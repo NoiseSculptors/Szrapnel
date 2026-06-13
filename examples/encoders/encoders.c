@@ -21,14 +21,6 @@ int main(void) {
     init_systick_1ms();
     io_init();
 
-//  uint32_t tmp = 0;
-
-//  while(1){
-//      tmp = *GPIOA_IDR;
-//      if(*GPIOA_IDR != tmp)
-//          printf("%032b\n",*GPIOA_IDR);
-//  }
-
     io_enc_t encoder0, encoder1;
 
     while(1){

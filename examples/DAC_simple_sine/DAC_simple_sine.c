@@ -1,20 +1,23 @@
 
+#include "io.h"
 #include <stdint.h>
 #include <math.h>
 
-#define SAMPLING_FREQ 48 
-#include "io.h"
-
 #define TWO_PI 6.283185307179586f
+
+#define FREQ_HZ_L     440.0f
+#define FREQ_HZ_R     440.5f
+
+static float phaseL, phaseR;
+static const float phaseStepL = (TWO_PI * FREQ_HZ_L) / SAMPLE_RATE;
+static const float phaseStepR = (TWO_PI * FREQ_HZ_R) / SAMPLE_RATE;
 
 void audio_fill_buffer(int32_t *audio_buffer, uint32_t samples_in_buffer)
 {
-    static float phaseL, phaseR;
-
     for (uint32_t i = 0; i < samples_in_buffer; i += 2) {
 
-        phaseL += (TWO_PI * 440.0f) / SAMPLE_RATE;
-        phaseR += (TWO_PI * 440.5f) / SAMPLE_RATE;
+        phaseL += phaseStepL;
+        phaseR += phaseStepR;
 
         if (phaseL >= TWO_PI) phaseL -= TWO_PI;
         if (phaseR >= TWO_PI) phaseR -= TWO_PI;
