@@ -1,6 +1,14 @@
 
 cmake_minimum_required(VERSION 3.31)
 
+# ---- CMSIS-DSP-----------------------------------------------------------------
+
+set(CMSISCORE "${CMAKE_SOURCE_DIR}/lib/CMSIS_6/CMSIS/Core")
+add_subdirectory(${CMAKE_SOURCE_DIR}/lib/CMSIS-DSP)
+target_link_libraries(CMSISDSP PUBLIC noisesculptors::core)
+target_include_directories(CMSISDSP PUBLIC ${CMSISCORE}/Include)
+add_library(lib::cmsis-dsp ALIAS CMSISDSP)
+
 # ---- printf -----------------------------------------------------------------
 add_library(lib_printf STATIC printf/printf.c)
 add_library(lib::printf ALIAS lib_printf)
