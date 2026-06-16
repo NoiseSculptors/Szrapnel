@@ -1,9 +1,9 @@
 
-# Szrapnel Open Synth Platform
+# Szrapnel | Hackable synth kit
 
 ## What It Is
 
-Szrapnel is an open synth platform for people who like to build, hack, experiment, and explore sound through hardware and firmware.
+Szrapnel is for people who like to build, hack, experiment, and explore sound through hardware and firmware.
 
 It is designed for **creative coders, synth hackers, experimental musicians, and embedded developers** who want a flexible tool they can learn from and shape over time.
 

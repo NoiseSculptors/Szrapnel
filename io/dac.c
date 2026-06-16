@@ -115,7 +115,7 @@ void io_dac_init(void)
     /* start gpiox clocks */
     *RCC_AHB4ENR |= (1<<GPIOAEN);
 
-//    gpio_ctrl(GPIOA, GPIO_OSPEED, GPIO4|GPIO5|GPIO7, OSPEED_MEDIUM);
+    gpio_ctrl(GPIOA, GPIO_OSPEED, GPIO4|GPIO5|GPIO7, OSPEED_MEDIUM);
     gpio_ctrl(GPIOA, GPIO_MODE,   GPIO4|GPIO5|GPIO7, MODE_AF);
     gpio_ctrl(GPIOA, GPIO_AFRL,   GPIO4|GPIO5|GPIO7, AF5);
 

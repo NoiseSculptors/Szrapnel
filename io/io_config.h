@@ -1,6 +1,6 @@
 
-#ifndef USER__CONFIG_IO_H
-#define USER__CONFIG_IO_H
+#ifndef IO_CONFIG_H
+#define IO_CONFIG_H
 
 #define WIDTH   160 
 #define HEIGHT  80
@@ -21,6 +21,7 @@ measure clock on DAC's BCK (13) pin
 //#define SAMPLING_FREQ 384
 //#define SAMPLING_FREQ 192
 //#define SAMPLING_FREQ 96
+
 #ifndef SAMPLING_FREQ
 #define SAMPLING_FREQ 48
 #endif
@@ -33,9 +34,11 @@ measure clock on DAC's BCK (13) pin
 #define SAMPLE_RATE 192000.0f
 #elif SAMPLING_FREQ == 384
 #define SAMPLE_RATE 384000.0f
+#else
+#error "Unsupported SAMPLING_FREQ"
 #endif
 
-#define BUFFER_DURATION       50 //ms
+#define BUFFER_DURATION       30 //ms
 #define AUDIO_CHANNELS        2  // 1 or 2
 #define SAMPLES_PER_CHANNEL   (SAMPLING_FREQ * BUFFER_DURATION)
 #define SAMPLES               (SAMPLES_PER_CHANNEL * AUDIO_CHANNELS)

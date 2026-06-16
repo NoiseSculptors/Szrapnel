@@ -2,6 +2,7 @@
 #ifndef IO_H
 #define IO_H
 
+#include "arm_math.h"
 #include "io_config.h"
 #include <stdint.h>
 #include <stddef.h>
@@ -30,6 +31,7 @@ void drawSoundBuffer(const int32_t *buffer,
                      uint16_t fg,
                      uint16_t bg);
 void lcd_draw_waveform(const int32_t* audio_buf, int32_t audio_samples);
+void lcd_draw_fft(const int32_t *audio_buf, uint32_t num_samples);
 void lcd_dma_send(uint8_t *arr, uint16_t n);
 void lcd_led_brightness(uint8_t pct);
 void lcd_flush_fb(void);

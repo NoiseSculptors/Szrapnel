@@ -143,6 +143,7 @@ target_compile_options(noisesculptors_${MCU}
     -ffunction-sections
     -fdata-sections
     -fno-builtin
+    -ffast-math
 )
 
 target_link_options(noisesculptors_${MCU}

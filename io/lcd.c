@@ -1,4 +1,5 @@
 
+#include "arm_math.h"
 #include "delay.h"
 #include "dma.h"
 #include "dmamux.h"
@@ -356,71 +357,6 @@ static inline void drawPixel(int x, int y, uint16_t color){
 
 }
 
-#if 0
-void lcd_draw_waveform(
-    const int32_t* audio_buf,  // Interleaved L/R int32_t audio buffer
-    int32_t audio_samples      // Total number of stereo frames in buffer
-)
-{
-    uint16_t fg = rgb565(0,255,255);   // Waveform color
-    uint16_t bg = rgb565(64,64,0);     // Background color
-
-    lcd_clear(bg);
-
-    // 1. Calculate layout boundaries (Horizontal split)
-    int32_t mid_y_l = HEIGHT / 4;           // Center Y for Left channel (top half)
-    int32_t mid_y_r = (3 * HEIGHT) / 4;     // Center Y for Right channel (bottom half)
-    int32_t max_amplitude = HEIGHT / 5;     // Maximum height of waveform
-
-    // 2. Fixed-point step size to map audio buffer to screen width
-    uint32_t fp_step = ((uint32_t)audio_samples << 16) / WIDTH;
-    uint32_t fp_index = 0;
-
-    for (int32_t x = 0; x < WIDTH; x++) {
-        int32_t sample_idx = fp_index >> 16;
-
-        // Interleaved int32_t stereo:
-        // [L0, R0, L1, R1, L2, R2, ...]
-        int32_t sample_l = audio_buf[sample_idx * 2];
-        int32_t sample_r = audio_buf[sample_idx * 2 + 1];
-
-        // Convert 32-bit signed samples to vertical amplitudes
-        int32_t h_l = (((sample_l >> 16) * max_amplitude) >> 15);
-        int32_t h_r = (((sample_r >> 16) * max_amplitude) >> 15);
-
-        // Left channel bounds
-        int32_t y_start_l = (h_l < 0) ? mid_y_l + h_l : mid_y_l;
-        int32_t y_end_l   = (h_l < 0) ? mid_y_l       : mid_y_l + h_l;
-
-        // Right channel bounds
-        int32_t y_start_r = (h_r < 0) ? mid_y_r + h_r : mid_y_r;
-        int32_t y_end_r   = (h_r < 0) ? mid_y_r       : mid_y_r + h_r;
-
-        // Draw Left channel column
-        if (y_start_l < 0) y_start_l = 0;
-        if (y_end_l >= HEIGHT) y_end_l = HEIGHT - 1;
-        uint16_t* pixel_ptr = &fb[y_start_l * WIDTH + x];
-        for (int32_t y = y_start_l; y <= y_end_l; y++) {
-            *pixel_ptr = fg;
-            pixel_ptr += WIDTH;
-        }
-
-        // Draw Right channel column
-        if (y_start_r < 0) y_start_r = 0;
-        if (y_end_r >= HEIGHT) y_end_r = HEIGHT - 1;
-        pixel_ptr = &fb[y_start_r * WIDTH + x];
-        for (int32_t y = y_start_r; y <= y_end_r; y++) {
-            *pixel_ptr = fg;
-            pixel_ptr += WIDTH;
-        }
-
-        fp_index += fp_step;
-    }
-
-    lcd_flush_fb();
-}
-#endif
-#if 1
 void lcd_draw_waveform(
     const int32_t* audio_buf,   // Interleaved L/R signed 32-bit samples stored in uint32_t
     int32_t audio_frames         // Number of stereo frames
@@ -466,40 +402,101 @@ void lcd_draw_waveform(
     }
 
 }
+
+#if SAMPLING_FREQ == 384
+#define FFT_SIZE 2048 
+#elif SAMPLING_FREQ == 192
+#define FFT_SIZE 1024
+#elif SAMPLING_FREQ == 96
+#define FFT_SIZE 512
+#elif SAMPLING_FREQ == 48
+#define FFT_SIZE 256
 #endif
-#if 0
-void lcd_draw_waveform(
-    const int32_t* audio_buf,
-    int32_t audio_frames
-)
+
+static float32_t fft_in[FFT_SIZE];
+static float32_t fft_out[FFT_SIZE];
+static float32_t mag[FFT_SIZE / 2 + 1];
+static arm_rfft_fast_instance_f32 fft_inst;
+static uint8_t fft_initialized = 0;
+
+static inline float32_t q31_to_f32(int32_t x)
 {
-    const uint16_t fg = rgb565(0, 255, 255);
-    const uint16_t bg = rgb565(64, 64, 0);
+    return (float32_t)x * (1.0f / 2147483648.0f);
+}
+
+static void draw_fft_channel(const int32_t *audio_buf,
+                             uint32_t frames,
+                             uint32_t channel,
+                             int y_start,
+                             int y_height,
+                             uint16_t fg)
+{
+    // Fill input for this channel
+    for (uint32_t i = 0; i < FFT_SIZE; i++) {
+        if (i < frames) {
+            fft_in[i] = q31_to_f32(audio_buf[2 * i + channel]);
+        } else {
+            fft_in[i] = 0.0f;
+        }
+    }
+
+    arm_rfft_fast_f32(&fft_inst, fft_in, fft_out, 0);
+
+    // Power spectrum
+    mag[0] = fft_out[0] * fft_out[0];
+    mag[FFT_SIZE / 2] = fft_out[1] * fft_out[1];
+
+    float32_t max_mag = 1e-12f;
+    for (uint32_t k = 1; k < FFT_SIZE / 2; k++) {
+        float32_t re = fft_out[2 * k];
+        float32_t im = fft_out[2 * k + 1];
+        mag[k] = re * re + im * im;
+        if (mag[k] > max_mag) max_mag = mag[k];
+    }
+
+    // Draw bars
+    const float32_t f_min = 20.0f;
+    float32_t f_max = 20000.0f;
+    float32_t nyquist = 0.5f * SAMPLE_RATE;
+    if (f_max > nyquist) f_max = nyquist;
+
+    for (int x = 0; x < WIDTH; x++) {
+        float32_t t = (WIDTH <= 1) ? 0.0f : (float32_t)x / (float32_t)(WIDTH - 1);
+        float32_t f = f_min + t * (f_max - f_min);
+
+        uint32_t bin = (uint32_t)(f * FFT_SIZE / SAMPLE_RATE);
+        if (bin > FFT_SIZE / 2) bin = FFT_SIZE / 2;
+
+        int h = (int)((mag[bin] / max_mag) * (y_height - 1));
+
+        if (h < 0) h = 0;
+        if (h > y_height - 1) h = y_height - 1;
+
+        for (int y = 0; y < h; y++) {
+            fb[(y_start + (y_height - 1 - y)) * WIDTH + x] = fg;
+        }
+    }
+}
+
+void lcd_draw_fft(const int32_t *audio_buf, uint32_t num_samples)
+{
+    if (!fft_initialized) {
+        if (arm_rfft_fast_init_f32(&fft_inst, FFT_SIZE) != ARM_MATH_SUCCESS) {
+            return;
+        }
+        fft_initialized = 1;
+    }
+
+    uint32_t frames = num_samples / 2;
+    if (frames > FFT_SIZE) frames = FFT_SIZE;
+
+    uint16_t fg = rgb565(255, 255, 0);
+    const uint16_t bg = rgb565(0, 64, 0);
 
     lcd_clear(bg);
 
-    const int32_t mid_y_l = HEIGHT / 4;
-    const int32_t mid_y_r = (3 * HEIGHT) / 4;
-    const int32_t max_amplitude = (HEIGHT / 2) - 2;
-
-    const uint32_t fp_step = ((uint32_t)audio_frames << 16) / WIDTH;
-    uint32_t fp_index = 0;
-
-    for (int32_t x = 0; x < WIDTH; x++) {
-        const int32_t sample_idx = fp_index >> 16;
-
-        const int32_t sample_l = (int32_t)audio_buf[sample_idx * 2];
-        const int32_t sample_r = (int32_t)audio_buf[sample_idx * 2 + 1];
-
-        const int32_t h_l = (((sample_l >> 16) * max_amplitude) >> 15);
-        const int32_t h_r = (((sample_r >> 16) * max_amplitude) >> 15);
-
-        fb[(mid_y_l + h_l) * WIDTH + x] = fg;
-        fb[(mid_y_r + h_r) * WIDTH + x] = fg;
-
-        fp_index += fp_step;
-    }
-
-    lcd_flush_fb();
+    draw_fft_channel(audio_buf, frames, 0, 0, HEIGHT / 2, fg); // left
+    fg = rgb565(0,255,255);
+    draw_fft_channel(audio_buf, frames, 1, HEIGHT / 2, HEIGHT / 2, fg); // right
 }
-#endif
+
