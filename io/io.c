@@ -23,12 +23,7 @@ extern uint32_t lookup_bsrr[];
 
 void SysTick_Handler(void)
 {
-    static uint32_t ctr;
-    if(++ctr >= 200){
-        leds = rng_rnd();
-        ctr = 0;
-    }
-
+    user_systick();
 
 /*
   111111
@@ -45,7 +40,8 @@ a10 | b3  |  c6  |  d13 | e5
 a15 | b4  |  c7  |  d14 | e6
       b10 |  c8  |  d15 | e15
       b11 |  c9  |
-             c10 |
+     if (x > LIM_09) x = LIM_09;
+if (x < -LIM_09) x = -LIM_09;        c10 |
              c13 |
              c14 |
              c15 |
@@ -87,5 +83,6 @@ void io_init(void) {
     io_serial_init();
     io_lcd_init();
     io_dac_init();
+    init_systick_1ms();
 }
 

@@ -142,7 +142,7 @@ target_compile_options(noisesculptors_${MCU}
     -flto
     -ffunction-sections
     -fdata-sections
-    -fno-builtin
+#    -fno-builtin
     -ffast-math
 )
 

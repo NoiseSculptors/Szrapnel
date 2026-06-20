@@ -3,6 +3,7 @@
 #define IO_H
 
 #include "arm_math.h"
+#include "rng.h"
 #include "io_config.h"
 #include <stdint.h>
 #include <stddef.h>
@@ -17,6 +18,8 @@ void io_serial_init(void);
 void dac_dma_loop(void);
 __attribute__((weak)) void audio_fill_buffer(int32_t *dst_interleaved_lr,
                                              uint32_t frames);
+
+__attribute__((weak)) void user_systick(void);
 
 typedef struct { uint16_t value;
                  int16_t delta;

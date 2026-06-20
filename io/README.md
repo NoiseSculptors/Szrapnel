@@ -1,9 +1,9 @@
 
-## PCB placement, keys and encoders
+## PCB placement, buttons and encoders
 
 **Encoders**: `EC[1..2]`
-**Keys/Leds**: `01..30`
-**Keys**: `RST`, `DFU`, `A..C`
+**Buttons/Leds**: `01..30`
+**Buttons**: `RST`, `DFU`, `A..C`
 
 ```
                       EC1       EC2
@@ -21,9 +21,9 @@ A   07    08    09    10    11    12   B
     25    26    27    28    29    30
 ```
 
-## Keys
+## Buttons
 
-|Key| GPIO | Key| GPIO | Key| GPIO |
+|Button| GPIO | Button| GPIO | Button| GPIO |
 |:-:|------|:--:|------|:--:|------|
 |01 | D13  | 16 | C5   | A  | D12  |
 |02 | C8   | 17 | D7   | B  | C1   |

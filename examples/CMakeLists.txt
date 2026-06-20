@@ -15,5 +15,6 @@ add_subdirectory(lcd_text)
 add_subdirectory(leds)
 add_subdirectory(serial)
 
+add_subdirectory(synthesis)
 add_subdirectory(test)
 

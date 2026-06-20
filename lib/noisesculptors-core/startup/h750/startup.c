@@ -197,6 +197,12 @@ static inline void zero32(uint32_t *dst, uint32_t *end){
 void def_irq_handler(void) { while (1); }
 
 void Reset_Handler(void) {
+
+#if 0
+TODO:
+       Clear and envalidate caches
+#endif
+
     /* Vector table is in FLASH / ;
        set VTOR (harmless even though reset already used it) */
     *SCB_VTOR = (uint32_t)&__VectorTable;

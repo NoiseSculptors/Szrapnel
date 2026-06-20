@@ -26,7 +26,7 @@ void audio_fill_buffer(int32_t *audio_buffer, uint32_t samples_in_buffer)
         audio_buffer[i+1] = (int32_t)(sinf(phaseR) * 2147483647.0f);
     }
 
-    lcd_draw_waveform(audio_buffer, 300);
+    lcd_draw_waveform(audio_buffer, 240);
     lcd_flush_fb();
 }
 
