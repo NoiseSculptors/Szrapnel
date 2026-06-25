@@ -123,13 +123,15 @@ void audio_fill_buffer(int32_t *audio_buffer, uint32_t samples_in_buffer)
         audio_buffer[i + 1] = delayed; // R
     }
 
+    leds_VU(audio_buffer[0], audio_buffer[1]);
     lcd_draw_waveform(audio_buffer, samples_in_buffer / 2);
-    lcd_flush_fb();
+    lcd_flush_fb_async();
 }
 
 int main(void)
 {
     io_init();
+    init_systick_1ms();
     make_harmony();
     dac_dma_loop();
     return 0;

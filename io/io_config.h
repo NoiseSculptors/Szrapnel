@@ -38,7 +38,7 @@ measure clock on DAC's BCK (13) pin
 #error "Unsupported SAMPLING_FREQ"
 #endif
 
-#define BUFFER_DURATION       50 //ms
+#define BUFFER_DURATION       20 //ms
 #define AUDIO_CHANNELS        2  // 1 or 2
 #define SAMPLES_PER_CHANNEL   (SAMPLING_FREQ * BUFFER_DURATION)
 #define SAMPLES               (SAMPLES_PER_CHANNEL * AUDIO_CHANNELS)

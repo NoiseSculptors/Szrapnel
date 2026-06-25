@@ -86,3 +86,24 @@ void io_buttons_init(void) {
     gpio_ctrl(GPIOB, GPIO_PUPD, GPIO4, PUPD_PULLDOWN);
 }
 
+uint32_t io_button_pressed(void)
+{
+    return (*GPIOA_IDR & 0x8740)|
+           (*GPIOB_IDR & 0x0c1b)|
+           (*GPIOC_IDR & 0xe7e0)|
+           (*GPIOD_IDR & 0xe0c0)|
+           (*GPIOE_IDR & 0x8078);
+}
+
+uint32_t io_side_button_pressed(void)
+{
+    return (*GPIOC_IDR & 0x0003)|(*GPIOD_IDR & 0x1000);
+}
+
+uint32_t io_side_button_status(void)
+{
+    static uint32_t status;
+    return status;
+}
+
+

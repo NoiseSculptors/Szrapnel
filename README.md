@@ -14,3 +14,6 @@ In simple terms: it is a tool for people who want to make things, change things,
 Open.
 Experimental.
 Built for makers, musicians, and curious programmers exploring sound and DSP.
+
+Recommended:
+pyocd pack install STM32H750VBTx

@@ -23,6 +23,15 @@ extern uint32_t lookup_bsrr[];
 
 void SysTick_Handler(void)
 {
+
+    /*
+__asm volatile("ldr   r3, =0xE000EF50");
+__asm volatile("movs  r4, #0");
+__asm volatile("str   r4, [r3]");
+__asm volatile("dsb   sy");
+__asm volatile("isb");
+*/
+
     user_systick();
 
 /*
@@ -83,6 +92,5 @@ void io_init(void) {
     io_serial_init();
     io_lcd_init();
     io_dac_init();
-    init_systick_1ms();
 }
 

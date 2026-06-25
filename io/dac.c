@@ -28,17 +28,13 @@ static volatile uint8_t next_cpu_buffer = 0; // 0 = CPU fills buf0, 1 = CPU fill
 static volatile uint8_t buffer_ready_to_fill = 1; // Start flagged as ready!
 #endif
 
-/* DMA buffers */
-__attribute__((aligned(32))) static int32_t dma_buf0[SAMPLES];
-__attribute__((aligned(32))) static int32_t dma_buf1[SAMPLES];
+/* DMA buffers (section marked with .dma is erased on startup) */
+int32_t dma_buf0[SAMPLES] __attribute__((section(".dma")));
+int32_t dma_buf1[SAMPLES] __attribute__((section(".dma")));
 
 // DMA: DBM + circular ping-pong
 static void io_dac_dma_init(void)
 {
-    // Prime both halves (silence to start)
-    for(size_t i = 0;i<(sizeof dma_buf0/sizeof dma_buf0[0]);++i)dma_buf0[i]=0;
-    for(size_t i = 0;i<(sizeof dma_buf1/sizeof dma_buf1[0]);++i)dma_buf1[i]=0;
-
     *RCC_AHB1ENR |= (1u<<0); // DMA1EN 0
 
     // Route DMAMUX1 Channel 5 to SPI1_TX (request ID 38)
@@ -68,7 +64,6 @@ static void io_dac_dma_init(void)
         | (2u<<13)  // MSIZE=32
         | (2u<<11)  // PSIZE=32
         | (1u<<10)  // MINC
-        | (1u<<8)   // CIRC
         | (1u<<6)   // DIR M2P
         | (1u<<4)   // TCIE
         | (1u<<2);  // TEIE
@@ -79,7 +74,7 @@ static void io_dac_dma_init(void)
     #define SPI_CFG1_TXDMAEN (1u<<15)
     *SPI1_CFG1 |= SPI_CFG1_TXDMAEN;
 
-//  NVIC_SetPriority(DMA1_Stream5_IRQn, 5);
+    // NVIC_SetPriority(DMA1_Stream5_IRQn, 5);
     irq_enable(IRQ_DMA_STR5);
 
     // Enable DMA stream, then enable + start I2S
@@ -173,91 +168,27 @@ void io_dac_init(void)
 
 void IRQ_DMA_STR5_Handler(void)
 {
-#if 1
     uint32_t hisr = *DMA1_HISR;
-
 #define DMA_HISR_TCIF5   11
 #define DMA_HIFCR_CTCIF5 11
-
     if (hisr & (1<<DMA_HISR_TCIF5)) {
         *DMA1_HIFCR |= (1<<DMA_HIFCR_CTCIF5);  // clear TC
-
         // After TC, CT selects the NEXT target → the OTHER half just finished.
         uint32_t ct = (*DMA1_S5CR >> 19) & 1u;
         if(ct)
             free0 = 1;
         else
             free1 = 1;
-
         sev(); // wake main loop if it's in WFE
     }
-#endif
-#if 0
-    uint32_t hisr = *DMA1_HISR;
-
-    if (hisr & (1 << 11)) { // TCIF5
-        *DMA1_HIFCR |= (1 << 11);  // Clear TC flag
-        buffer_ready_to_fill = 1;
-        sev(); // Wake up main loop
-    }
-#endif
-}
-
-static void SCB_CleanDCache_by_Addr(uint32_t *addr, int32_t dsize)
-{
-    // The Cortex-M7 L1 cache line size is always 32 bytes
-    const uint32_t cache_line_size = 32u;
-
-    uint32_t start_addr = (uint32_t)addr;
-    uint32_t end_addr   = start_addr + (uint32_t)dsize;
-
-    // Align the starting address downward to the nearest 32-byte boundary
-    start_addr &= ~(cache_line_size - 1u);
-
-    // Loop through the memory range, cleaning one cache line at a time
-    while (start_addr < end_addr) {
-        // DCCMVAC register address is 0xE000EF68
-        // Writing the address to it flushes that cache line to RAM
-        *(volatile uint32_t *)0xE000EF68u = start_addr;
-
-        start_addr += cache_line_size;
-    }
-
-    // Memory Barrier to ensure the cache operations finish before DMA starts
-    __asm__ volatile ("dsb ish" ::: "memory");
-    __asm__ volatile ("isb"     ::: "memory");
 }
 
 void dac_dma_loop(){
     for (;;) {
-#if 0
-0       while (!buffer_ready_to_fill) {
-            wfe();
-        }
-        buffer_ready_to_fill = 0;
-
-        int32_t *p = (next_cpu_buffer == 0) ? dma_buf0 : dma_buf1;
-
-        audio_fill_buffer(p, SAMPLES);
-
-     // MANDATORY FOR STM32H7: Push data from L1 Cache down to RAM so DMA can see it
-     // If you don't have a dedicated function, use the CMSIS standard macro:
-     // SCB_CleanDCache_by_Addr((uint32_t*)p, SAMPLES * sizeof(int32_t));
-        next_cpu_buffer = !next_cpu_buffer;
-#endif
-#if 1
         int idx; int32_t *p;
         wait_for_free_half(&idx, &p);
-
         audio_fill_buffer(p, SAMPLES);
-
-        // If buffers are cacheable, clean only this half. If MPU made them
-        // non-cacheable, this is a no-op.  CLEAN_DCACHE_RANGE(p, BUF_WORDS *
-        // sizeof(int32_t));
-
-        // Release the flag
         if (idx == 0) free0 = 0; else free1 = 0;
-#endif
     }
 }
 

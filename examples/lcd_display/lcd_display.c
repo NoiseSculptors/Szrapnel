@@ -1,35 +1,17 @@
 
-#include "delay.h"
-#include "dwt.h"
-#include "gpio.h"
 #include "init.h"
-#include "nvic.h"
-#include "printf.h"
-#include "rcc.h"
-#include "rng.h"
-#include "lcd_display.h"
-#include "systick.h"
 #include "io.h"
+#include "lcd_display.h"
 #include <stdint.h>
-#include <string.h>
 
 #define GREEN 0x6535
 
-extern uint16_t fb[WIDTH*HEIGHT*2] __attribute__((aligned(32)));
-
-static void init_hw(void)
-{
-	init_clock();
-    io_init();
-    lcd_led_brightness(100);
-    init_systick_1ms();
-}
+static uint16_t *fb;
 
 static void draw_logos(void)
 {
 	 int n;
 
-#if 0
 	 for(int i=0;i<200;i++){
          for(int j=0;j<160*80;j++)
              fb[j]=rng_rnd();
@@ -48,9 +30,8 @@ static void draw_logos(void)
                  n++;
              }
          }
-         lcd_flush_fb(fb);
+         lcd_flush_fb();
      }
-#endif
 
      for(int i=0;i<550;i++){
          for(int j=0;j<160*80;j++)
@@ -72,7 +53,10 @@ static void draw_logos(void)
 
 int main(void){
 
-	init_hw();
+	init_clock();
+    io_init();
+    lcd_flush_fb();
+    fb = lcd_get_fb();
 
     while(1){
        draw_logos();

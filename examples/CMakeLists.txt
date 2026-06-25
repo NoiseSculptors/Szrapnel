@@ -2,6 +2,7 @@
 cmake_minimum_required(VERSION 3.19)
 
 add_subdirectory(blink)
+add_subdirectory(buttons_noise)
 add_subdirectory(DAC_simple_dma)
 add_subdirectory(DAC_simple_fft)
 add_subdirectory(DAC_simple_noise)

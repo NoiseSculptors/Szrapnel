@@ -15,28 +15,32 @@
    leds[0] corresponds to the top left led */
 extern uint32_t leds;
 
+static void print_encoder_status(io_enc_t enc0, io_enc_t enc1)
+{
+    static uint16_t tmp0,tmp1,tmp2,tmp3;
+    enc0 = io_enc_read(0);
+    enc1 = io_enc_read(1);
+    if((enc0.value!=tmp0) || (enc1.value!=tmp1) ||
+       (enc0.delta!=tmp2) || (enc1.delta!=tmp3)
+            )
+        printf("%04x %04x %02d %02d\n", enc0.value, enc1.value,
+                                        enc0.delta, enc1.delta);
+    tmp0 = enc0.value;
+    tmp1 = enc1.value;
+    tmp2 = enc0.delta;
+    tmp3 = enc1.delta;
+}
+
 int main(void) {
 
     init_clock();
-    init_rng();
-    io_init();
     io_encoders_init();
     io_serial_init();
 
     io_enc_t encoder0, encoder1;
+
     while(1){
-        static uint16_t tmp0,tmp1,tmp2,tmp3;
-        encoder0 = io_enc_read(0);
-        encoder1 = io_enc_read(1);
-        if((encoder0.value!=tmp0) || (encoder1.value!=tmp1) ||
-           (encoder0.delta!=tmp2) || (encoder1.delta!=tmp2)
-                )
-            printf("%04x %04x %02d %02d\n", encoder0.value, encoder1.value,
-                                          encoder0.delta, encoder1.delta);
-        tmp0 = encoder0.value;
-        tmp1 = encoder1.value;
-        tmp2 = encoder1.delta;
-        tmp3 = encoder1.delta;
+        print_encoder_status(encoder0, encoder1);
     }
 }
 

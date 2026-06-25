@@ -20,10 +20,13 @@
 
 #define PRINTF_BUFSZ (20*10)+1 // 20x10 (8x8px) characters
 
-uint16_t fb[WIDTH*HEIGHT*2] __attribute__((aligned(32))); 
-uint16_t *fb1, *fb2;
-static uint8_t cmd[4] __attribute__((aligned(32))); 
-static uint8_t parameter[4] __attribute__((aligned(32))); 
+
+/* already aligned 32 in ld script(s)
+   uint16_t fb[WIDTH*HEIGHT] __attribute__((aligned(32),section(".dma"))); */
+uint16_t fb[WIDTH*HEIGHT] __attribute__((section(".dma")));
+uint8_t ramwr[1] __attribute__((section(".dma")));
+static uint8_t cmd[4] __attribute__((section(".dma"))); 
+static uint8_t parameter[4] __attribute__((section(".dma"))); 
 volatile uint32_t lcd_busy;
 extern uint8_t font_8x8_linux[256*8];
 extern uint8_t font_6x10_linux[256*8];
@@ -35,13 +38,23 @@ uint16_t *lcd_get_fb(void)
 
 void lcd_flush_fb(void)
 {
-    static uint8_t ramwr[1] __attribute__((aligned(32))) = {0x2c}; // ramwr
+    ramwr[0] = 0x2c;
     *GPIOD_BSRR = 0x2000000; // CS low - sending command
     lcd_dma_send(ramwr, 1);    // sending one byte - ramwr
     delay_us(10);
     *GPIOD_BSRR = 0x200;     // CS high - sending data
     lcd_dma_send((uint8_t*)fb, 25600);
     delay_ms(2);
+}
+
+void lcd_flush_fb_async(void)
+{
+    ramwr[0] = 0x2c;
+    *GPIOD_BSRR = 0x2000000; // CS low - sending command
+    lcd_dma_send(ramwr, 1);    // sending one byte - ramwr
+    delay_us(1);
+    *GPIOD_BSRR = 0x200;     // CS high - sending data
+    lcd_dma_send((uint8_t*)fb, 25600);
 }
 
 static void lcd_command(uint8_t n)
@@ -135,9 +148,6 @@ static void lcd_init_dma(void){
 #define DELAY 1
 void io_lcd_init(void)
 {
-
-    fb1 = fb;
-    fb2 = fb+(WIDTH*HEIGHT);
 
     *RCC_AHB4ENR |= (1u<<GPIOBEN)| (1u<<GPIODEN);
 /********** Display ***********************************************************/
@@ -296,42 +306,6 @@ int lcd_printf(int x, int y, int xmul, int ymul,
 
     return n;
 }
-
-#if 0
-int lcd_printf(int x, int y, uint16_t text_color,
-                             uint16_t bg_color, const char *fmt, ...)
-{
-    char buf[PRINTF_BUFSZ];
-    va_list ap;
-    va_start(ap, fmt);
-    int n = vsnprintf(buf, sizeof(buf), fmt, ap);
-    va_end(ap);
-    if (buf[0] == '\0') return n;
-
-    for (const char *p = buf; *p; p++) {
-        if (*p == '\n' || x + 8 > WIDTH) {
-            y += 8;
-            if (y + 8 > HEIGHT) break;
-            if (*p == '\n') continue;
-        }
-
-        const uint8_t *g = font_8x8_linux + (*p) * 8;
-
-        for (int r = 0; r < 8; r++) {
-            uint8_t font_byte = g[r];
-            uint16_t *dst = &fb[(y + r) * WIDTH + x];
-            for (int c = 0; c < 8; c++) {
-                if (font_byte & (0x80 >> c))
-                    dst[c] = text_color;
-                else
-                    dst[c] = bg_color;
-            }
-        }
-        x += 8;
-    }
-    return n;
-}
-#endif
 
 void lcd_pixel(uint8_t x, uint8_t y, uint16_t color)
 {
