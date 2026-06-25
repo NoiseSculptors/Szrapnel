@@ -12,7 +12,7 @@ static float phaseL, phaseR;
 static const float phaseStepL = (TWO_PI * FREQ_HZ_L) / SAMPLE_RATE;
 static const float phaseStepR = (TWO_PI * FREQ_HZ_R) / SAMPLE_RATE;
 
-void audio_fill_buffer(int32_t *audio_buffer, uint32_t samples_in_buffer)
+void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
 {
     for (uint32_t i = 0; i < samples_in_buffer; i += 2) {
 
@@ -33,7 +33,7 @@ void audio_fill_buffer(int32_t *audio_buffer, uint32_t samples_in_buffer)
 int main(void)
 {
     io_init();
-    dac_dma_loop();
+    audio_start();
     return 0;
 }
 

@@ -19,8 +19,8 @@ void io_init(void);
 void io_lcd_init(void);
 void io_serial_init(void);
 
-void dac_dma_loop(void);
-__attribute__((weak)) void audio_fill_buffer(int32_t *dst_interleaved_lr,
+void audio_start(void);
+__attribute__((weak)) void audio_feed(int32_t *dst_interleaved_lr,
                                              uint32_t frames);
 
 __attribute__((weak)) void user_systick(void);

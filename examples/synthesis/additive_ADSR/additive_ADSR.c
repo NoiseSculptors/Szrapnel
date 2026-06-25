@@ -90,7 +90,7 @@ static float adsr_next(void)
     return env;
 }
 
-void audio_fill_buffer(int32_t *audio_buffer, uint32_t samples_in_buffer)
+void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
 {
     const float inv_sr = 1.0f / SAMPLE_RATE;
     const float amp = 3.0f / (float)N_OSC; /* adjust amplitude here */
@@ -133,7 +133,7 @@ int main(void)
     io_init();
     init_systick_1ms();
     make_harmony();
-    dac_dma_loop();
+    audio_start();
     return 0;
 }
 

@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 /* Fill the stereo audio buffer with random samples */
-void audio_fill_buffer(int32_t *stereo_buffer, uint32_t samples)
+void audio_feed(int32_t *stereo_buffer, uint32_t samples)
 {
     /* Generate left/right samples */
     for (uint32_t i = 0; i < samples; i += 2) {
@@ -24,7 +24,7 @@ int main(void)
     io_init();
 
     /* Start DAC DMA audio loop */
-    dac_dma_loop();
+    audio_start();
 
     return 0;
 }

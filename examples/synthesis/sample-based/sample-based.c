@@ -45,7 +45,7 @@ static uint32_t delay_pos = 0;
 const uint32_t total_samples = sizeof(drums) / sizeof(drums[0]);
 io_enc_t enc0, enc1;
 
-void audio_fill_buffer(int32_t *audio_buffer, uint32_t samples_in_buffer)
+void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
 {
     static uint32_t current_sample = 0;
     static int32_t wait = 3, wait_set = 1, shift = 16;
@@ -93,7 +93,7 @@ void audio_fill_buffer(int32_t *audio_buffer, uint32_t samples_in_buffer)
 int main(void)
 {
     io_init();
-    dac_dma_loop();
+    audio_start();
     return 0;
 }
 

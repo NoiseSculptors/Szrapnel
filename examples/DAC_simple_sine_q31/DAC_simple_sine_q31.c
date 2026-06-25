@@ -6,6 +6,17 @@
 #define FREQ_HZ_L     440u
 #define FREQ_HZ_R     440.5f
 
+/*
+ * For most applications on the STM32H750, using floating-point (F32)
+ * calculations is actually faster than Q31 or Q15 fixed-point math. This is
+ * because the H7 has a dedicated Hardware Floating Point Unit (FPU).
+ * Fixed-point is used here primarily as a demonstration of CMSIS-DSP
+ * fixed-point features.
+ *
+ * STMicroelectronics Application Note AN4841: "Digital signal processing for
+ * STM32 microcontrollers using CMSIS".
+ */
+
 static uint32_t phaseL, phaseR = 0;
 
 static const uint32_t phaseStepL =
@@ -13,7 +24,7 @@ static const uint32_t phaseStepL =
 static const uint32_t phaseStepR =
     (uint32_t)(((double)FREQ_HZ_R * 4294967296.0) / (double)SAMPLE_RATE);
 
-void audio_fill_buffer(int32_t *audio_buffer, uint32_t samples_in_buffer)
+void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
 {
     for (uint32_t i = 0; i < samples_in_buffer; i += 2) {
         phaseL += phaseStepL;
@@ -34,7 +45,7 @@ void audio_fill_buffer(int32_t *audio_buffer, uint32_t samples_in_buffer)
 int main(void)
 {
     io_init();
-    dac_dma_loop();
+    audio_start();
     return 0;
 }
 

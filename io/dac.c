@@ -183,11 +183,11 @@ void IRQ_DMA_STR5_Handler(void)
     }
 }
 
-void dac_dma_loop(){
+void audio_start(){
     for (;;) {
         int idx; int32_t *p;
         wait_for_free_half(&idx, &p);
-        audio_fill_buffer(p, SAMPLES);
+        audio_feed(p, SAMPLES);
         if (idx == 0) free0 = 0; else free1 = 0;
     }
 }

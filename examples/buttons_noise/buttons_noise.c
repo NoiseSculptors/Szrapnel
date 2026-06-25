@@ -7,7 +7,7 @@
 #define BTN25 (*GPIOC_IDR & (1<<7)) 
 #define BTN30 (*GPIOE_IDR & (1<<3)) 
 
-void audio_fill_buffer(int32_t *stereo_buffer, uint32_t samples)
+void audio_feed(int32_t *stereo_buffer, uint32_t samples)
 {
     for (uint32_t i = 0; i < samples; i += 2) {
 
@@ -26,7 +26,7 @@ void audio_fill_buffer(int32_t *stereo_buffer, uint32_t samples)
 int main(void)
 {
     io_init();
-    dac_dma_loop();
+    audio_start();
 
     return 0;
 }
