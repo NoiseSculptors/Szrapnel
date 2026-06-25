@@ -24,7 +24,7 @@ int main(void)
     io_init();
 
     /* Start DAC DMA audio loop */
-    audio_start();
+    audio_loop_start();
 
     return 0;
 }

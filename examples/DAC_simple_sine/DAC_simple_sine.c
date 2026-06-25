@@ -33,7 +33,7 @@ void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
 int main(void)
 {
     io_init();
-    audio_start();
+    audio_loop_start();
     return 0;
 }
 

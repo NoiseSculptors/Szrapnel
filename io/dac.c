@@ -183,7 +183,7 @@ void IRQ_DMA_STR5_Handler(void)
     }
 }
 
-void audio_start(){
+void audio_loop_start(){
     for (;;) {
         int idx; int32_t *p;
         wait_for_free_half(&idx, &p);

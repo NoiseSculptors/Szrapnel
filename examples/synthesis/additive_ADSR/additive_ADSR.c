@@ -133,7 +133,7 @@ int main(void)
     io_init();
     init_systick_1ms();
     make_harmony();
-    audio_start();
+    audio_loop_start();
     return 0;
 }
 
