@@ -357,19 +357,20 @@ void lcd_draw_waveform(
         const int32_t sample_l = (int32_t)audio_buf[sample_idx * 2];
         const int32_t sample_r = (int32_t)audio_buf[sample_idx * 2 + 1];
 
-        // Fast scaling using upper 16 bits
         const int32_t h_l = (((sample_l >> 16) * max_amplitude) >> 15);
         const int32_t h_r = (((sample_r >> 16) * max_amplitude) >> 15);
 
         const int32_t y_l = mid_y_l + h_l;
         const int32_t y_r = mid_y_r + h_r;
 
+        const int32_t draw_x = WIDTH - 1 - x;
+
         if ((unsigned)y_l < (unsigned)HEIGHT) {
-            fb[y_l * WIDTH + x] = fgL;
+            fb[y_l * WIDTH + draw_x] = fgL;
         }
 
         if ((unsigned)y_r < (unsigned)HEIGHT) {
-            fb[y_r * WIDTH + x] = fgR;
+            fb[y_r * WIDTH + draw_x] = fgR;
         }
 
         fp_index += fp_step;
@@ -385,6 +386,10 @@ void lcd_draw_waveform(
 #define FFT_SIZE 512
 #elif SAMPLING_FREQ == 48
 #define FFT_SIZE 256
+#elif SAMPLING_FREQ == 32
+#define FFT_SIZE 256 
+#elif SAMPLING_FREQ == 16
+#define FFT_SIZE 128
 #endif
 
 static float32_t fft_in[FFT_SIZE];

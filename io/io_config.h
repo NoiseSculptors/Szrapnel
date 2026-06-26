@@ -18,15 +18,22 @@ measure clock on DAC's BCK (13) pin
 */
 
 // select one
-//#define SAMPLING_FREQ 384
+#define SAMPLING_FREQ 384
 //#define SAMPLING_FREQ 192
 //#define SAMPLING_FREQ 96
+//#define SAMPLING_FREQ 48
+//#define SAMPLING_FREQ 32
+//#define SAMPLING_FREQ 16
 
 #ifndef SAMPLING_FREQ
 #define SAMPLING_FREQ 48
 #endif
 
-#if SAMPLING_FREQ == 48
+#if   SAMPLING_FREQ == 16
+#define SAMPLE_RATE 16000.0f
+#elif SAMPLING_FREQ == 32
+#define SAMPLE_RATE 32000.0f
+#elif SAMPLING_FREQ == 48
 #define SAMPLE_RATE 48000.0f
 #elif SAMPLING_FREQ == 96
 #define SAMPLE_RATE 96000.0f
@@ -38,7 +45,7 @@ measure clock on DAC's BCK (13) pin
 #error "Unsupported SAMPLING_FREQ"
 #endif
 
-#define BUFFER_DURATION       20 //ms
+#define BUFFER_DURATION       25 //ms
 #define AUDIO_CHANNELS        2  // 1 or 2
 #define SAMPLES_PER_CHANNEL   (SAMPLING_FREQ * BUFFER_DURATION)
 #define SAMPLES               (SAMPLES_PER_CHANNEL * AUDIO_CHANNELS)

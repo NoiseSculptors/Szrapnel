@@ -27,7 +27,7 @@ static int env_state = 0;
 static uint32_t env_pos = 0;
 
 /* delay between channels */
-static int32_t delay_buf[DELAY_SAMPLES];
+int32_t delay_buf[DELAY_SAMPLES] __attribute__((section(".dma")));
 static uint32_t delay_pos = 0;
 
 static float midi_to_hz(int n)
@@ -92,7 +92,6 @@ static float adsr_next(void)
 
 void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
 {
-    const float inv_sr = 1.0f / SAMPLE_RATE;
     const float amp = 3.0f / (float)N_OSC; /* adjust amplitude here */
 
     for (uint32_t i = 0; i < samples_in_buffer; i += 2)
@@ -103,7 +102,7 @@ void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
         for (int o = 0; o < N_OSC; o++)
         {
             s += arm_sin_f32(phase[o]);
-            phase[o] += 2.0f * PI * freq[o] * inv_sr;
+            phase[o] += 2.0f * PI * freq[o] / SAMPLE_RATE;
             if (phase[o] >= 2.0f * PI) phase[o] -= 2.0f * PI;
         }
 

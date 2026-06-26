@@ -133,11 +133,16 @@ void io_dac_init(void)
 #define PCMSYNC 7
 #define DATALEN 8
 #define CHLEN   10
-#define I2SDIV  16  
+#define I2SDIV  16 /* 8-bit */
     /* enable I2S mode, Philips mode,  */
     *SPI1_I2SCFGR = 0;
     *SPI1_I2SCFGR |=
-#if   SAMPLING_FREQ == 48
+        
+#if   SAMPLING_FREQ == 16 
+                     (144 << I2SDIV)   |
+#elif SAMPLING_FREQ == 32
+                     (72 << I2SDIV)   |
+#elif SAMPLING_FREQ == 48
                      (48 << I2SDIV)   |
 #elif SAMPLING_FREQ == 96
                      (24 << I2SDIV)   |

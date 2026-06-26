@@ -1,21 +1,23 @@
 
 cmake_minimum_required(VERSION 3.19)
 
-add_subdirectory(blink)
-add_subdirectory(buttons_noise)
 add_subdirectory(DAC_simple_dma)
 add_subdirectory(DAC_simple_fft)
 add_subdirectory(DAC_simple_noise)
+add_subdirectory(DAC_simple_saw)
 add_subdirectory(DAC_simple_sine)
 add_subdirectory(DAC_simple_sine_q31)
+add_subdirectory(DAC_simple_square)
+add_subdirectory(DAC_simple_triangle)
+add_subdirectory(DAC_simple_without_dma)
+add_subdirectory(blink)
+add_subdirectory(buttons_noise)
 add_subdirectory(encoders)
 add_subdirectory(lcd_display)
 add_subdirectory(lcd_gradient)
-add_subdirectory(DAC_simple_without_dma)
 add_subdirectory(lcd_text)
 add_subdirectory(leds)
 add_subdirectory(serial)
-
 add_subdirectory(synthesis)
 add_subdirectory(test)
 
