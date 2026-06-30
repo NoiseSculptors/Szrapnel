@@ -53,9 +53,9 @@ static void draw_logos(void)
 
 int main(void){
 
-	init_clock();
     io_init();
     lcd_flush_fb();
+
     fb = lcd_get_fb();
 
     while(1){

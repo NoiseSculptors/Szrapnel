@@ -91,6 +91,5 @@ void io_init(void) {
     io_encoders_init();
     io_serial_init();
     io_lcd_init();
-    io_dac_init();
 }
 

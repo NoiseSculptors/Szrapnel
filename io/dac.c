@@ -1,7 +1,7 @@
 
 #include "delay.h"
 #include "dma.h"
-#include "dmamux.h"
+#include "dmamux.h" 
 #include "gpio.h"
 #include "io.h"
 #include "nvic.h"
@@ -13,34 +13,65 @@
 #include "spi_i2s.h"
 
 /* PCM5102A is connected to:
-   A4  I2S1_WS
-   A5  I2S1_CK
-   A7  I2S1_SDO
+     A4  I2S1_WS
+     A5  I2S1_CK
+     A7  I2S1_SDO
+
+To confirm sampling frequency,
+measure clock on DAC's BCK (13) pin
+ s.freq     
+  /1000  MHz
+     16  1.024
+     32  2.048 
+     48  3.072 
+     96  6.144 
+    192  12.288
+    384  24.576
 */
+
+#define DEFAULT_SAMPLE_RATE 48000
+#define DEFAULT_CHANNELS    STEREO
+#define DEFAULT_BUFFER_MS   25 
+#define DEFAULT_SAMPLES     ((DEFAULT_SAMPLE_RATE/1000)*DEFAULT_BUFFER_MS*DEFAULT_CHANNELS)
+
+/* leave enough place for highest sample rate (384000/48000=8) */
+#define BUFSIZE  (DEFAULT_SAMPLES * 8)
+
+static struct audio_cfg cfg = {
+    DEFAULT_SAMPLE_RATE,
+    DEFAULT_CHANNELS,
+    DEFAULT_SAMPLES,
+};
+
+struct audio_cfg* get_audio_cfg(void)
+{
+    return &cfg;
+}
+
+float get_sample_rate(void)
+{
+    return cfg.sample_rate;
+}
 
 static volatile uint8_t free0 = 0;
 static volatile uint8_t free1 = 0;
 static inline void sev(void) { __asm__ volatile ("sev" ::: "memory"); }
 static inline void wfe(void) { __asm__ volatile ("wfe" ::: "memory"); }
 
-#if 0
-static volatile uint8_t next_cpu_buffer = 0; // 0 = CPU fills buf0, 1 = CPU fills buf1
-static volatile uint8_t buffer_ready_to_fill = 1; // Start flagged as ready!
-#endif
-
 /* DMA buffers (section marked with .dma is erased on startup) */
-int32_t dma_buf0[SAMPLES] __attribute__((section(".dma")));
-int32_t dma_buf1[SAMPLES] __attribute__((section(".dma")));
+int32_t dma_buf0[BUFSIZE] __attribute__((section(".dma")));
+int32_t dma_buf1[BUFSIZE] __attribute__((section(".dma")));
 
 // DMA: DBM + circular ping-pong
 static void io_dac_dma_init(void)
 {
-    *RCC_AHB1ENR |= (1u<<0); // DMA1EN 0
+    *RCC_AHB1ENR &= ~(1u<<0); // DMA1EN 0
+    *RCC_AHB1ENR |= (1u<<0);        
 
     // Route DMAMUX1 Channel 5 to SPI1_TX (request ID 38)
     // DMAMUX channel index equals DMA stream index for DMA1.
 #define SPI1_TX_DMA 38u // page 695 in RM0433
-    *DMAMUX1_C5CR = 0; // reset chan
+    *DMAMUX1_C5CR = 0;  // reset chan
     *DMAMUX1_C5CR = (SPI1_TX_DMA & 0x7Fu); // DMAREQ_ID[6:0], no sync
 
     // Make sure stream disabled
@@ -52,7 +83,7 @@ static void io_dac_dma_init(void)
     *DMA1_S5PAR  = (uint32_t)SPI1_TXDR;
     *DMA1_S5M0AR = (uint32_t)dma_buf0;
     *DMA1_S5M1AR = (uint32_t)dma_buf1;
-    *DMA1_S5NDTR = SAMPLES; // words per HALF
+    *DMA1_S5NDTR = cfg.samples;
 
     // FIFO: enable, full threshold
     *DMA1_S5FCR = (1u<<2)  // DMDIS
@@ -71,7 +102,7 @@ static void io_dac_dma_init(void)
     *DMA1_S5CR = cr;
 
     // Enable SPI TX DMA requests
-    #define SPI_CFG1_TXDMAEN (1u<<15)
+#define SPI_CFG1_TXDMAEN (1u<<15)
     *SPI1_CFG1 |= SPI_CFG1_TXDMAEN;
 
     // NVIC_SetPriority(DMA1_Stream5_IRQn, 5);
@@ -101,7 +132,7 @@ static inline void wait_for_free_half(int *idx_out, int32_t **ptr_out)
     }
 }
 
-void io_dac_init(void)
+static void io_dac_init(void)
 {
     pll_2_start(PLLSRC_HSE, 16, 181, 3968, 1, 128, 128, 26000000u);
 
@@ -116,6 +147,7 @@ void io_dac_init(void)
 
     /* start spi1 clock */
 #define SPI1EN 12
+    *RCC_APB2ENR &= ~(1<<SPI1EN);
     *RCC_APB2ENR |= (1<<SPI1EN);
 
     /* disable I2S */
@@ -136,28 +168,13 @@ void io_dac_init(void)
 #define I2SDIV  16 /* 8-bit */
     /* enable I2S mode, Philips mode,  */
     *SPI1_I2SCFGR = 0;
-    *SPI1_I2SCFGR |=
-        
-#if   SAMPLING_FREQ == 16 
-                     (144 << I2SDIV)   |
-#elif SAMPLING_FREQ == 32
-                     (72 << I2SDIV)   |
-#elif SAMPLING_FREQ == 48
-                     (48 << I2SDIV)   |
-#elif SAMPLING_FREQ == 96
-                     (24 << I2SDIV)   |
-#elif SAMPLING_FREQ == 192
-                     (12 << I2SDIV)   |
-#elif SAMPLING_FREQ == 384
-                     (6 << I2SDIV)   |
-#else
-#  error "Unsupported SAMPLING_FREQ"
-#endif
-                     (0b1<<CHLEN)    | /* 0-16bit 1-32bit */
-                     (0b10<<DATALEN) | /* 0-16bit 1-24bit 2-32bit */
-                     (0b0<<PCMSYNC)  |
-                     (0b00<<I2SSTD)  |
-                     (0b010<<I2SCFG) |
+    uint32_t i2s_div = 2304/(cfg.sample_rate/1000);
+    *SPI1_I2SCFGR |= (i2s_div<< I2SDIV)|
+                     (0b1<<CHLEN)      | /* 0-16bit 1-32bit */
+                     (0b10<<DATALEN)   | /* 0-16bit 1-24bit 2-32bit */
+                     (0b0<<PCMSYNC)    |
+                     (0b00<<I2SSTD)    |
+                     (0b010<<I2SCFG)   |
                      (0b1<<I2SMOD);
 
     /* enable I2S */
@@ -169,6 +186,28 @@ void io_dac_init(void)
 
     io_dac_dma_init();
 
+}
+
+void audio_config(uint32_t s_freq, uint8_t ch, uint16_t buf_ms)
+{
+    switch (s_freq) {
+        case  16000:
+        case  32000:
+        case  48000:
+        case  96000:
+        case 192000:
+        case 384000:
+            cfg.sample_rate = s_freq;
+            break;
+        default:
+            cfg.sample_rate = DEFAULT_SAMPLE_RATE;
+            break;
+    }
+
+    cfg.channels = (ch == 1 || ch == 2) ? ch : DEFAULT_CHANNELS;
+    cfg.samples = (cfg.sample_rate / 1000) * buf_ms * cfg.channels;
+
+    io_dac_init();
 }
 
 void IRQ_DMA_STR5_Handler(void)
@@ -192,7 +231,7 @@ void audio_loop_start(){
     for (;;) {
         int idx; int32_t *p;
         wait_for_free_half(&idx, &p);
-        audio_feed(p, SAMPLES);
+        audio_feed(p, cfg.samples);
         if (idx == 0) free0 = 0; else free1 = 0;
     }
 }

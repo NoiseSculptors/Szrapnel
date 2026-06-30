@@ -4,6 +4,8 @@
 #include "io.h"
 #include <stdint.h>
 
+#define SAMPLE_RATE     48000
+#define BUFFER_MS       25
 #define BTN25 (*GPIOC_IDR & (1<<7)) 
 #define BTN30 (*GPIOE_IDR & (1<<3)) 
 
@@ -11,8 +13,8 @@ void audio_feed(int32_t *stereo_buffer, uint32_t samples)
 {
     for (uint32_t i = 0; i < samples; i += 2) {
 
-        int32_t L = BTN25 ? rng_rnd() : 0;
-        int32_t R = BTN30 ? rng_rnd() : 0;
+        int32_t L = BTN25 ? (int32_t)rng_rnd()>>1 : 0;
+        int32_t R = BTN30 ? (int32_t)rng_rnd()>>1 : 0;
 
         stereo_buffer[i + 0] = L;
         stereo_buffer[i + 1] = R;
@@ -26,8 +28,8 @@ void audio_feed(int32_t *stereo_buffer, uint32_t samples)
 int main(void)
 {
     io_init();
+    audio_config(SAMPLE_RATE, STEREO, BUFFER_MS);
     audio_loop_start();
-
     return 0;
 }
 

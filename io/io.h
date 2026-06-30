@@ -13,13 +13,22 @@
 #define WHITE 0xffff
 
 void io_buttons_init(void);
-void io_dac_init(void);
 void io_encoders_init(void);
 void io_init(void);
 void io_lcd_init(void);
 void io_serial_init(void);
 
+struct audio_cfg {
+    uint32_t sample_rate;
+    uint8_t  channels;
+    uint16_t samples;
+};
+
+float get_sample_rate(void);
+struct audio_cfg* get_audio_cfg(void);
 void audio_loop_start(void);
+void audio_config(uint32_t s_freq, uint8_t ch, uint16_t buf_ms);
+
 __attribute__((weak)) void audio_feed(int32_t *dst_interleaved_lr,
                                              uint32_t frames);
 
@@ -42,7 +51,7 @@ void drawSoundBuffer(const int32_t *buffer,
                      uint16_t fg,
                      uint16_t bg);
 void lcd_draw_waveform(const int32_t* audio_buf, int32_t audio_samples);
-void lcd_draw_fft(const int32_t *audio_buf, uint32_t num_samples);
+void lcd_draw_fft(const int32_t *audio_buf, uint32_t num_samples, uint32_t fft_size);
 void lcd_dma_send(uint8_t *arr, uint16_t n);
 void lcd_led_brightness(uint8_t pct);
 void lcd_flush_fb(void);

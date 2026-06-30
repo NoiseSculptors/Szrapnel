@@ -3,6 +3,9 @@
 #include "io.h"
 #include <stdint.h>
 
+#define SAMPLE_RATE   384000
+#define BUFFER_MS     25
+
 #define FREQ_HZ_L     440u
 #define FREQ_HZ_R     440.5f
 
@@ -38,13 +41,14 @@ void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
         audio_buffer[i+1] = sinR;
     }
 
-    lcd_draw_waveform(audio_buffer, 300);
+    lcd_draw_waveform(audio_buffer, SAMPLE_RATE/(BUFFER_MS*8));
     lcd_flush_fb();
 }
 
 int main(void)
 {
     io_init();
+    audio_config(SAMPLE_RATE, STEREO, BUFFER_MS);
     audio_loop_start();
     return 0;
 }

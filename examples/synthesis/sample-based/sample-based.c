@@ -34,11 +34,14 @@
      - Output is limited to 70%, but it can still be loud.
  */
 
+#define SAMPLE_RATE     384000
+#define BUFFER_MS       25
+#define DELAY_MS        50
+#define DELAY_SAMPLES   ((SAMPLE_RATE/1000) * DELAY_MS)
 #define Q31(x) ((int32_t)((x) * 2147483647.0f))
 #define LIMIT Q31(0.7f)
 
-#define DELAY_SAMPLES (SAMPLING_FREQ * 10) /* 10ms L/R delay for width */
-/* delay between channels */
+/* L/R delay for width */
 static int32_t delay_buf[DELAY_SAMPLES];
 static uint32_t delay_pos = 0;
 
@@ -85,7 +88,7 @@ void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
         }
     }
 
-    lcd_draw_waveform(audio_buffer, samples_in_buffer / 2);
+    lcd_draw_waveform(audio_buffer, SAMPLE_RATE/(BUFFER_MS*4));
     lcd_printf(0,0,1,1,0xffff,0,"%02d\n%02d", wait_set, shift);
     lcd_flush_fb();
 }
@@ -93,6 +96,7 @@ void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
 int main(void)
 {
     io_init();
+    audio_config(SAMPLE_RATE, STEREO, BUFFER_MS);
     audio_loop_start();
     return 0;
 }

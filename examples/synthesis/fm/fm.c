@@ -11,9 +11,11 @@
    right encoder = modulation depth 
  */
 
-#define TWO_PI 6.283185307179586f
-#define BTN25 (*GPIOC_IDR & (1<<7))
-#define BTN26 (*GPIOA_IDR & (1<<9))
+#define SAMPLE_RATE    384000
+#define BUFFER_MS      18
+#define TWO_PI         6.283185307179586f
+#define BTN25          (*GPIOC_IDR & (1<<7))
+#define BTN26          (*GPIOA_IDR & (1<<9))
 
 static float mod_phase = 0.0f, car_phase = 0.0f;
 
@@ -80,7 +82,7 @@ void audio_feed(int32_t *stereo_buffer, uint32_t samples){
     read_input();
     voice_fill(stereo_buffer, samples);
 
-    lcd_draw_waveform(stereo_buffer, 2400);
+    lcd_draw_waveform(stereo_buffer, SAMPLE_RATE/(BUFFER_MS*8));
     lcd_printf(0,0,1,1,0xffff,0,"%.2f\n%.2f\n%.3f x %.3f",
             (double)car_freq,
             (double)mod_index,
@@ -91,6 +93,8 @@ void audio_feed(int32_t *stereo_buffer, uint32_t samples){
 
 int main(void){
     io_init();
+    audio_config(SAMPLE_RATE, STEREO, BUFFER_MS);
     audio_loop_start();
     return 0;
 }
+
