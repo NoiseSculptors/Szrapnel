@@ -11,25 +11,31 @@
 #include <stdint.h>
 
 /* each bit (0-29) represents a led,
-   leds[0] corresponds to the top left led */
+   leds bit 0  corresponds to the top left led
+   leds bit 29 corresponds to the bottom right led
+ */
 extern uint32_t leds;
 
 int main(void) {
 
-    init_clock();
-    init_rng();
     io_init();
 
-    printf("-------\n");
-
-    /* works if systick led routine not active */
+    /* works only if systick led routine not active */
     for(int i=0;i<30;i++){
         led_on(i);
-//        delay_ms(30);
+        delay_ms(50);
     }
 
     /* activate systick, trigger every ms */
     init_systick_1ms();
+
+    leds = 0;
+
+        for(int i=0;i<30;i++){
+            leds |= (1<<i);
+            delay_ms(50);
+            leds = 0;
+        }
 
     uint8_t led_fb[5] = {
         0b011110,

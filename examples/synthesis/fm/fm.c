@@ -1,4 +1,5 @@
 
+#include "arm_math.h"
 #include "io.h"
 #include "gpio.h"
 #include <stdint.h>
@@ -13,12 +14,14 @@
 
 #define SAMPLE_RATE    384000
 #define BUFFER_MS      18
+#define DELAY_SAMPLES   ((SAMPLE_RATE/1000) * 10) // ms
 #define TWO_PI         6.283185307179586f
 #define BTN25          (*GPIOC_IDR & (1<<7))
 #define BTN26          (*GPIOA_IDR & (1<<9))
 
+int32_t delay_buf[DELAY_SAMPLES];
+static uint32_t delay_pos = 0;
 static float mod_phase = 0.0f, car_phase = 0.0f;
-
 static float car_freq  = 220.0f;
 static float mod_ratio = 3.5f;
 static float mod_index = 5.0f;
@@ -59,6 +62,7 @@ static void voice_fill(int32_t *buf, uint32_t samples){
     const float inv_sr = 1.0f / SAMPLE_RATE;
 
     const float mod_freq       = car_freq * mod_ratio;
+
     const float mod_step       = mod_freq * TWO_PI * inv_sr;
     const float car_step_base  = car_freq * TWO_PI * inv_sr;
 
@@ -72,9 +76,14 @@ static void voice_fill(int32_t *buf, uint32_t samples){
 
         float s = car_sig * volume;
 
-        int32_t q31 = (int32_t)(limit(s) * Q31_MAX);
-        buf[i] = q31;
-        buf[i + 1] = q31;
+        int32_t dry = (int32_t)(limit(s) * Q31_MAX);
+
+        int32_t delayed = delay_buf[delay_pos];
+        delay_buf[delay_pos] = dry;
+        delay_pos++;
+        if (delay_pos >= DELAY_SAMPLES) delay_pos = 0;
+        buf[i] = dry;
+        buf[i + 1] = dry;
     }
 }
 

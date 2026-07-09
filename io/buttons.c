@@ -1,12 +1,11 @@
 
+/*
 #include "delay.h"
 #include "dma.h"
 #include "dmamux.h"
-#include "gpio.h"
 #include "i2c.h"
 #include "nvic.h"
 #include "printf.h"
-#include "rcc.h"
 #include "rng.h"
 #include "rng.h"
 #include "spi.h"
@@ -14,8 +13,12 @@
 #include "syscall.h"
 #include "systick.h"
 #include "timer.h"
-#include "io.h"
 #include <string.h>
+*/
+
+#include "rcc.h"
+#include "gpio.h"
+#include "io.h"
 
 /*
  buttons:                   side: 
@@ -86,7 +89,7 @@ void io_buttons_init(void) {
     gpio_ctrl(GPIOB, GPIO_PUPD, GPIO4, PUPD_PULLDOWN);
 }
 
-uint32_t io_button_pressed(void)
+uint32_t button_pressed(void)
 {
     return (*GPIOA_IDR & 0x8740)|
            (*GPIOB_IDR & 0x0c1b)|
@@ -95,15 +98,43 @@ uint32_t io_button_pressed(void)
            (*GPIOE_IDR & 0x8078);
 }
 
-uint32_t io_side_button_pressed(void)
+uint32_t button_side_pressed(void)
 {
     return (*GPIOC_IDR & 0x0003)|(*GPIOD_IDR & 0x1000);
 }
 
-uint32_t io_side_button_status(void)
+const uint8_t btn_port[30] = {
+    3, 2, 1, 1, 2, 2, 3, 2, 4, 0,
+    4, 2, 3, 0, 1, 2, 3, 4, 2, 0,
+    2, 1, 1, 4, 2, 0, 0, 1, 3, 4
+};
+
+const uint8_t btn_bit[30] = {
+    13,  8, 10, 4, 13, 15, 14, 9, 15,  6,
+     4, 14, 15, 8, 11,  5,  7, 6,  6, 10,
+    10,  0,  3, 5,  7,  9, 15, 1,  6,  3
+};
+
+uint8_t button(int i)
 {
-    static uint32_t status;
-    return status;
+    switch (btn_port[i]) {
+        case 0: return !((*GPIOA_IDR) & (1u << btn_bit[i])) == 0;
+        case 1: return !((*GPIOB_IDR) & (1u << btn_bit[i])) == 0;
+        case 2: return !((*GPIOC_IDR) & (1u << btn_bit[i])) == 0;
+        case 3: return !((*GPIOD_IDR) & (1u << btn_bit[i])) == 0;
+        case 4: return !((*GPIOE_IDR) & (1u << btn_bit[i])) == 0;
+        default: return 0;
+    }
+
+    return 0;
 }
 
+uint8_t button_side(int i)
+{
+    switch (i) {
+        case 0: return !((*GPIOD_IDR) & (1u << 12)) == 0;
+        case 1: return !((*GPIOC_IDR) & (1u << 1))  == 0;
+        case 2: return !((*GPIOC_IDR) & (1u << 0))  == 0;
+    }
+}
 

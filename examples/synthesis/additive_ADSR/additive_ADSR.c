@@ -1,4 +1,5 @@
 
+#include "ns_audio.h"
 #include "delay.h"
 #include "io.h"
 #include "rng.h"
@@ -6,92 +7,65 @@
 
 /*
    Additive synthesis demo:
-   - 190(!) sine oscillators are summed together
+   - 2100(!) sine oscillators are summed together
    - frequencies are chosen to form a simple harmonic pattern
    - an ADSR envelope shapes each note
    - stereo width is created with a small channel delay
  */
 
 #define SAMPLE_RATE     48000
-#define BUFFER_MS       25
-#define N_OSC           190
-#define DELAY_SAMPLES   ((SAMPLE_RATE/1000) * 25) // ms
-#define ENV_ATTACK_MS   3000.0f
-#define ENV_DECAY_MS    1500.0f
-#define ENV_RELEASE_MS  5000.0f
-#define SINE_LUT_SIZE   8192 // must be power of two
-#define SINE_LUT_MASK   (SINE_LUT_SIZE - 1u)
+#define BUFFER_MS       30
+#define N_OSC           2100 
+#define DELAY_SAMPLES   ((SAMPLE_RATE/1000) * 50) // ms
+#define ENV_ATTACK_MS   1000.0f
+#define ENV_DECAY_MS    1000.0f
+#define ENV_RELEASE_MS  3000.0f
 #define TWO_PI          6.283185307179586f
+#define LUT_SHIFT       19 // 2^13=8192 (our LUT size), 32-13=19
 
-static float phase[N_OSC], freq[N_OSC];
+extern float sin_lut[SINE_LUT_SIZE] __attribute__((section(".dtcm_bss")));
+int32_t delay_buf[DELAY_SAMPLES] __attribute__((section(".dtcm_bss")));
 static float env = 0.0f;
 static int env_state = 0;
-static uint32_t env_pos = 0;
-static const float k_rad_to_idx = (float)SINE_LUT_SIZE / TWO_PI;
-
-int32_t delay_buf[DELAY_SAMPLES] __attribute__((section(".dtcm_bss")));
-float sin_lut[SINE_LUT_SIZE] __attribute__((section(".dtcm_bss")));
 static uint32_t delay_pos = 0;
+static uint32_t env_pos = 0;
+static uint32_t incs[N_OSC] __attribute__((section(".dtcm_bss")));
+static uint32_t midi_inc[128] __attribute__((section(".dtcm_bss")));
+static uint32_t phase[N_OSC] __attribute__((section(".dtcm_bss")));
 
-static float midi_note_to_hz_lut[128] __attribute__((section(".dtcm_bss")));
-
-static void sin_lut_init(void)
+static void midi_inc_init(void)
 {
-    const float step = TWO_PI / (float)SINE_LUT_SIZE;
-    const float offset = 0.5f * step; // midpoint
-    for (uint32_t i = 0; i < SINE_LUT_SIZE; ++i) {
-        sin_lut[i] = sinf(offset + step * (float)i);
+    for (int n = 0; n < 128; n++)
+    {
+        float f = midi_to_hz(n);
+        midi_inc[n] = (uint32_t)(f * (4294967296.0f / (float)SAMPLE_RATE));
     }
 }
 
-static void midi_lut_init(void)
-{
-    for (int n = 0; n < 128; n++) {
-        midi_note_to_hz_lut[n] = 440.0f * powf(2.0f, (n - 69) / 12.0f);
-    }
-}
-
-// No-interp lookup (nearest/lower bin). phase ∈ [0, 2π]
-static inline float fast_sin(const float phase)
-{
-    // Assumes 'phase' already wrapped to [0, 2π); avoid fmodf here.
-    uint32_t idx = (uint32_t)(phase * k_rad_to_idx);
-    idx &= SINE_LUT_MASK; // cheap modulo (size must be power of two)
-    return sin_lut[idx];
-}
-
-static inline float midi_to_hz(int n)
-{
-    if (n < 0)   n = 0;
-    if (n > 127) n = 127;
-    return midi_note_to_hz_lut[n];
-}
-
+__attribute__((section(".itcm"),used))
 static inline void make_harmony(void)
 {
-    int root = 33 + (rng_rnd() % 24);
-    float f0 = midi_to_hz(root);
+    static const int8_t offsets[] = { 0, 0, 0, 2, 3, 5, 7, 10, 12, 12, 15, 17, 19, 22, 24 };
+    const int root = 30 + (rng_rnd() % 10);
+    const int n = (int)(sizeof(offsets) / sizeof(offsets[0]));
 
     for (int i = 0; i < N_OSC; i++)
     {
-        float f = f0;
+        uint32_t r = rng_rnd();
+        int note = root + offsets[r % n] + (((r >> 8) & 1) ? 12 : 0);
+        if (note > 127) note = 127;
+        incs[i] = midi_inc[note];
 
-        if (i & 1) f *= 1.5f;
-        if (i & 2) f *= 1.25f;
-
-        if (rng_rnd() & 1) f *= 0.5f;
-        if (rng_rnd() & 2) f *= 2.0f;
-
-        f *= 1.0f + ((int)(rng_rnd() & 255) - 128) * 0.0002f;
-        freq[i] = f;
+        phase[i] = 0; // reset phase so every harmony starts like first run
     }
 }
 
+__attribute__((section(".itcm"),used))
 static inline float adsr_next(void)
 {
-    const float atk_n = (ENV_ATTACK_MS  * 0.001f) * (float)SAMPLE_RATE;
-    const float dec_n = (ENV_DECAY_MS   * 0.001f) * (float)SAMPLE_RATE;
-    const float rel_n = (ENV_RELEASE_MS * 0.001f) * (float)SAMPLE_RATE;
+    const float atk_n = ((ENV_ATTACK_MS  * 0.001f) * (float)SAMPLE_RATE);
+    const float dec_n = ((ENV_DECAY_MS   * 0.001f) * (float)SAMPLE_RATE);
+    const float rel_n = ((ENV_RELEASE_MS * 0.001f) * (float)SAMPLE_RATE);
     const float inv_atk_n = 1/atk_n;
     const float inv_dec_n = 1/dec_n;
     const float inv_rel_n = 1/rel_n;
@@ -124,38 +98,127 @@ static inline float adsr_next(void)
     if (env > 1.0f) env = 1.0f;
     return env;
 }
- __attribute__((section(".itcm")))
+
+__attribute__((section(".itcm"),used))
 void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
 {
-    const float amp = 3.0f / (float)N_OSC; /* adjust amplitude here */
+    const float out_gain = 1.0f / (float)N_OSC;
+    const uint32_t am_inc = (uint32_t)(4.0f * (4294967296.0f / (float)SAMPLE_RATE)); /* AM rate Hz */
+
+    static uint32_t am_phase = 0;
+
+    uint32_t dp = delay_pos;
 
     for (uint32_t i = 0; i < samples_in_buffer; i += 2)
     {
-        float s = 0.0f;
-        float e = adsr_next();
+        const float * lut = sin_lut;
+        const float e = adsr_next();
+        uint32_t * ic = incs;
+        uint32_t * ph = phase;
 
-        for (int o = 0; o < N_OSC; o++)
+        float a0=0.0f;
+        float a1=0.0f;
+        float a2=0.0f;
+        float a3=0.0f;
+        float a4=0.0f;
+        float a5=0.0f;
+        float a6=0.0f;
+        float a7=0.0f;
+        float a8=0.0f;
+        float a9=0.0f;
+        float a10=0.0f;
+        float a11=0.0f;
+        float a12=0.0f;
+        float a13=0.0f;
+        float a14=0.0f;
+        float a15=0.0f;
+
+        int o = 0;
+
+        for (; o <= (N_OSC-16); o += 16)
         {
-            s += fast_sin(phase[o]);
-            phase[o] += 2.0f * PI * freq[o] / (float)SAMPLE_RATE;
-            if (phase[o] >= 2.0f * PI) phase[o] -= 2.0f * PI;
+            uint32_t p0 = ph[o + 0] + ic[o + 0];
+            uint32_t p1 = ph[o + 1] + ic[o + 1];
+            uint32_t p2 = ph[o + 2] + ic[o + 2];
+            uint32_t p3 = ph[o + 3] + ic[o + 3];
+            uint32_t p4 = ph[o + 4] + ic[o + 4];
+            uint32_t p5 = ph[o + 5] + ic[o + 5];
+            uint32_t p6 = ph[o + 6] + ic[o + 6];
+            uint32_t p7 = ph[o + 7] + ic[o + 7];
+            uint32_t p8 = ph[o + 8] + ic[o + 8];
+            uint32_t p9 = ph[o + 9] + ic[o + 9];
+            uint32_t p10 = ph[o + 10] + ic[o + 10];
+            uint32_t p11 = ph[o + 11] + ic[o + 11];
+            uint32_t p12 = ph[o + 12] + ic[o + 12];
+            uint32_t p13 = ph[o + 13] + ic[o + 13];
+            uint32_t p14 = ph[o + 14] + ic[o + 14];
+            uint32_t p15 = ph[o + 15] + ic[o + 15];
+
+            ph[o + 0] = p0;
+            ph[o + 1] = p1;
+            ph[o + 2] = p2;
+            ph[o + 3] = p3;
+            ph[o + 4] = p4;
+            ph[o + 5] = p5;
+            ph[o + 6] = p6;
+            ph[o + 7] = p7;
+            ph[o + 8] = p8;
+            ph[o + 9] = p9;
+            ph[o + 10] = p10;
+            ph[o + 11] = p11;
+            ph[o + 12] = p12;
+            ph[o + 13] = p13;
+            ph[o + 14] = p14;
+            ph[o + 15] = p15;
+
+            a0 += lut[p0 >> LUT_SHIFT];
+            a1 += lut[p1 >> LUT_SHIFT];
+            a2 += lut[p2 >> LUT_SHIFT];
+            a3 += lut[p3 >> LUT_SHIFT];
+            a4 += lut[p4 >> LUT_SHIFT];
+            a5 += lut[p5 >> LUT_SHIFT];
+            a6 += lut[p6 >> LUT_SHIFT];
+            a7 += lut[p7 >> LUT_SHIFT];
+            a8 += lut[p8 >> LUT_SHIFT];
+            a9 += lut[p9 >> LUT_SHIFT];
+            a10 += lut[p10 >> LUT_SHIFT];
+            a11 += lut[p11 >> LUT_SHIFT];
+            a12 += lut[p12 >> LUT_SHIFT];
+            a13 += lut[p13 >> LUT_SHIFT];
+            a14 += lut[p14 >> LUT_SHIFT];
+            a15 += lut[p15 >> LUT_SHIFT];
         }
 
-        s *= amp * e;
+        float s = (a0 + a1) + (a2 + a3) + (a4 + a5) + (a6 + a7) +
+                  (a8 + a9) + (a10 + a11) + (a12 + a13) + (a14 + a15);
 
-        if (s > 1.0f) s = 1.0f;
-        if (s < -1.0f) s = -1.0f;
+        for (; o < N_OSC; o++)
+        {
+            uint32_t p = ph[o] + ic[o];
+            ph[o] = p;
+            s += lut[p >> LUT_SHIFT];
+        }
 
-        int32_t dry = (int32_t)(s * 2147483647.0f);
+        am_phase += am_inc;
+        const float am = 0.65f + 0.35f * lut[am_phase >> LUT_SHIFT]; /* 0.3 .. 1.0 */
 
-        int32_t delayed = delay_buf[delay_pos];
-        delay_buf[delay_pos] = dry;
-        delay_pos++;
-        if (delay_pos >= DELAY_SAMPLES) delay_pos = 0;
+        s *= (e * out_gain * am);
 
-        audio_buffer[i + 0] = dry;     // L
-        audio_buffer[i + 1] = delayed; // R
+        if (s > 0.999f) s = 0.999f;
+        if (s < -0.999f) s = -0.999f;
+
+        const int32_t dry = (int32_t)(s * 2147483647.0f);
+
+        const int32_t delayed = delay_buf[dp];
+        delay_buf[dp] = dry;
+        dp++;
+        if (dp >= DELAY_SAMPLES) dp = 0;
+
+        audio_buffer[i + 0] = dry;
+        audio_buffer[i + 1] = delayed;
     }
+
+    delay_pos = dp;
 
     leds_VU(audio_buffer[0], audio_buffer[1]);
     lcd_draw_waveform(audio_buffer, samples_in_buffer / 2);
@@ -164,11 +227,11 @@ void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
 
 int main(void)
 {
-    midi_lut_init();
-    sin_lut_init();
     io_init();
-    audio_config(SAMPLE_RATE, STEREO, BUFFER_MS);
+    sin_lut_init();
+    midi_inc_init();
     init_systick_1ms();
+    audio_config(SAMPLE_RATE, STEREO, BUFFER_MS);
     make_harmony();
     audio_loop_start();
     return 0;

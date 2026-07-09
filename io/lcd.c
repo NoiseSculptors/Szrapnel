@@ -1,5 +1,4 @@
 
-#include "arm_math.h"
 #include "delay.h"
 #include "dma.h"
 #include "dmamux.h"
@@ -20,22 +19,20 @@
 
 #define PRINTF_BUFSZ (20*10)+1 // 20x10 (8x8px) characters
 
-
-/* already aligned 32 in ld script(s)
-   uint16_t fb[WIDTH*HEIGHT] __attribute__((aligned(32),section(".dma"))); */
 uint16_t fb[WIDTH*HEIGHT] __attribute__((section(".dma")));
 uint8_t ramwr[1] __attribute__((section(".dma")));
 static uint8_t cmd[4] __attribute__((section(".dma"))); 
 static uint8_t parameter[4] __attribute__((section(".dma"))); 
 volatile uint32_t lcd_busy;
 extern uint8_t font_8x8_linux[256*8];
-extern uint8_t font_6x10_linux[256*8];
 
+__attribute__((section(".itcm"),used))
 uint16_t *lcd_get_fb(void)
 {
     return fb;
 }
 
+__attribute__((section(".itcm"),used))
 void lcd_flush_fb(void)
 {
     ramwr[0] = 0x2c;
@@ -47,6 +44,7 @@ void lcd_flush_fb(void)
     delay_ms(2);
 }
 
+__attribute__((section(".itcm"),used))
 void lcd_flush_fb_async(void)
 {
     ramwr[0] = 0x2c;
@@ -57,6 +55,7 @@ void lcd_flush_fb_async(void)
     lcd_dma_send((uint8_t*)fb, 25600);
 }
 
+__attribute__((section(".itcm"),used))
 static void lcd_command(uint8_t n)
 {
     /* DC low */
@@ -65,6 +64,7 @@ static void lcd_command(uint8_t n)
     lcd_dma_send(cmd, 1);
 }
 
+__attribute__((section(".itcm"),used))
 static void lcd_data(uint8_t *arr, uint16_t n)
 {
     /* DC high */
@@ -153,8 +153,10 @@ void io_lcd_init(void)
 /********** Display ***********************************************************/
     *RCC_APB1LENR  |=  (1u<<14)| // SPI2EN
                        (1u<<6);  // TIM12EN
-    *RCC_APB1LRSTR |=  (1u<<14); // SPI2RST
-    *RCC_APB1LRSTR &= ~(1u<<14); // SPI2RST
+
+ // *RCC_APB1LRSTR |=  (1u<<14); // SPI2RST
+ // *RCC_APB1LRSTR &= ~(1u<<14); // SPI2RST
+
     gpio_ctrl(GPIOD, GPIO_MODE, GPIO8|GPIO9|GPIO10, MODE_OUTPUT); // EN RESET DC
     gpio_ctrl(GPIOB, GPIO_MODE, GPIO12|GPIO13|GPIO14|GPIO15, MODE_AF);
     gpio_ctrl(GPIOB, GPIO_AFRH, GPIO12|GPIO13|GPIO15, AF5); // SPI2 NSS SCK MOSI
@@ -170,7 +172,7 @@ void io_lcd_init(void)
     *GPIOD_ODR |= (1<<8);
     delay_ms(120);
 
-    lcd_pwr(0); delay_ms(100); lcd_pwr(1); // power cycle
+    // lcd_pwr(0); delay_ms(100); lcd_pwr(1); // power cycle
     // lcd_command(0x01); delay_ms(150);    // SWRESET
     lcd_command(0x11); delay_ms(150);    // SLEEPOUT
 
@@ -225,9 +227,12 @@ void io_lcd_init(void)
 
     lcd_command(0x29); delay_ms(20);    // DISPLAY ON
     delay_ms(DELAY);
+
     lcd_led_brightness(100);
+    lcd_flush_fb();
 }
 
+__attribute__((section(".itcm"),used))
 void lcd_dma_send(uint8_t *arr, uint16_t n)
 {
     // disable TXDMA
@@ -251,11 +256,13 @@ void lcd_dma_send(uint8_t *arr, uint16_t n)
    r:0001111100000000
    b:0000000011111000 
    g:1110000000000111 */
+__attribute__((section(".itcm"),used))
 uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b)
 {
     return ((g & 0x1C) << 3 | (r >> 3)) << 8 | (b & 0xF8) | g >> 5;
 }
 
+__attribute__((section(".itcm"), used))
 int lcd_printf(int x, int y, int xmul, int ymul,
                uint16_t text_color,
                uint16_t bg_color, const char *fmt, ...)
@@ -269,9 +276,15 @@ int lcd_printf(int x, int y, int xmul, int ymul,
     int n = vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
 
-    int x_origin = x;
-    if (buf[0] == '\0') return n;
+    if (n < 0)
+        return n;
 
+    buf[sizeof(buf) - 1] = '\0';
+
+    if (buf[0] == '\0')
+        return n;
+
+    int x_origin = x;
     const int glyph_w = 8 * xmul;
     const int glyph_h = 8 * ymul;
 
@@ -279,11 +292,13 @@ int lcd_printf(int x, int y, int xmul, int ymul,
         if (*p == '\n' || x + glyph_w > WIDTH) {
             y += glyph_h;
             x = x_origin;
-            if (y + glyph_h > HEIGHT) break;
-            if (*p == '\n') continue;
+            if (y + glyph_h > HEIGHT)
+                break;
+            if (*p == '\n')
+                continue;
         }
 
-        const uint8_t *g = font_8x8_linux + (*p) * 8;
+        const uint8_t *g = font_8x8_linux + ((uint8_t)*p) * 8;
 
         for (int r = 0; r < 8; r++) {
             uint8_t font_byte = g[r];
@@ -291,11 +306,17 @@ int lcd_printf(int x, int y, int xmul, int ymul,
             for (int ry = 0; ry < ymul; ry++) {
                 uint16_t *dst = &fb[(y + r * ymul + ry) * WIDTH + x];
 
-                for (int c = 0; c < 8; c++) {
-                    uint16_t color = (font_byte & (0x80 >> c)) ? text_color : bg_color;
-
-                    for (int rx = 0; rx < xmul; rx++) {
-                        dst[c * xmul + rx] = color;
+                if (xmul == 1) {
+                    for (int c = 0; c < 8; c++) {
+                        dst[c] = (font_byte & (0x80 >> c)) ? text_color : bg_color;
+                    }
+                } else {
+                    for (int c = 0; c < 8; c++) {
+                        uint16_t color = (font_byte & (0x80 >> c)) ? text_color : bg_color;
+                        uint16_t *px = dst + c * xmul;
+                        for (int rx = 0; rx < xmul; rx++) {
+                            px[rx] = color;
+                        }
                     }
                 }
             }
@@ -307,31 +328,29 @@ int lcd_printf(int x, int y, int xmul, int ymul,
     return n;
 }
 
+__attribute__((section(".itcm"),used))
 void lcd_pixel(uint8_t x, uint8_t y, uint16_t color)
 {
 	fb[(y*WIDTH)+x] = color;
 }
 
+__attribute__((section(".itcm"),used))
 void lcd_clear(uint16_t color)
 {
     for(int i=0;i<WIDTH*HEIGHT;i++)
         fb[i]=color;
 }
 
-void lcd_clear_flush(uint16_t color)
+__attribute__((section(".itcm"),used))
+static void lcd_clear_flush(uint16_t color)
 {
     for(int i=0;i<WIDTH*HEIGHT;i++)
         fb[i]=color;
     lcd_flush_fb();
 }
 
-static inline void drawPixel(int x, int y, uint16_t color){
-    uint16_t pos = y*WIDTH + x;
-    fb[pos] = color;
-
-}
-
-void lcd_draw_waveform(
+__attribute__((section(".itcm"),used))
+inline void lcd_draw_waveform(
     const int32_t* audio_buf,   // Interleaved L/R signed 32-bit samples stored in uint32_t
     int32_t audio_frames         // Number of stereo frames
 )
@@ -376,95 +395,5 @@ void lcd_draw_waveform(
         fp_index += fp_step;
     }
 
-}
-
-static arm_rfft_fast_instance_f32 fft_inst;
-static uint8_t fft_initialized = 0;
-
-static inline float32_t q31_to_f32(int32_t x)
-{
-    return (float32_t)x * (1.0f / 2147483648.0f);
-}
-
-static void draw_fft_channel(const int32_t *audio_buf,
-                             uint32_t frames,
-                             uint32_t fft_size,
-                             uint32_t channel,
-                             int y_start,
-                             int y_height,
-                             uint16_t fg)
-{
-    const float sample_rate = get_sample_rate();
-    float fft_in[fft_size];
-    float fft_out[fft_size];
-    float mag[fft_size / 2 + 1];
-
-    // Fill input for this channel
-    for (uint32_t i = 0; i < fft_size; i++) {
-        if (i < frames) {
-            fft_in[i] = q31_to_f32(audio_buf[2 * i + channel]);
-        } else {
-            fft_in[i] = 0.0f;
-        }
-    }
-
-    arm_rfft_fast_f32(&fft_inst, fft_in, fft_out, 0);
-
-    // Power spectrum
-    mag[0] = fft_out[0] * fft_out[0];
-    mag[fft_size / 2] = fft_out[1] * fft_out[1];
-
-    float32_t max_mag = 1e-12f;
-    for (uint32_t k = 1; k < fft_size/ 2; k++) {
-        float32_t re = fft_out[2 * k];
-        float32_t im = fft_out[2 * k + 1];
-        mag[k] = re * re + im * im;
-        if (mag[k] > max_mag) max_mag = mag[k];
-    }
-
-    // Draw bars
-    const float32_t f_min = 20.0f;
-    float32_t f_max = 20000.0f;
-    float32_t nyquist = 0.5f * sample_rate;
-    if (f_max > nyquist) f_max = nyquist;
-
-    for (int x = 0; x < WIDTH; x++) {
-        float32_t t = (WIDTH <= 1) ? 0.0f : (float32_t)x / (float32_t)(WIDTH - 1);
-        float32_t f = f_min + t * (f_max - f_min);
-
-        uint32_t bin = (uint32_t)(f * fft_size / sample_rate);
-        if (bin > fft_size / 2) bin = fft_size / 2;
-
-        int h = (int)((mag[bin] / max_mag) * (y_height - 1));
-
-        if (h < 0) h = 0;
-        if (h > y_height - 1) h = y_height - 1;
-
-        for (int y = 0; y < h; y++) {
-            fb[(y_start + (y_height - 1 - y)) * WIDTH + x] = fg;
-        }
-    }
-}
-
-void lcd_draw_fft(const int32_t *audio_buf, uint32_t num_samples, uint32_t fft_size)
-{
-    if (!fft_initialized) {
-        if (arm_rfft_fast_init_f32(&fft_inst, fft_size) != ARM_MATH_SUCCESS) {
-            return;
-        }
-        fft_initialized = 1;
-    }
-
-    uint32_t frames = num_samples / 2;
-    if (frames > fft_size) frames = fft_size;
-
-    uint16_t fg = rgb565(255, 255, 0);
-    const uint16_t bg = rgb565(0, 64, 0);
-
-    lcd_clear(bg);
-
-    draw_fft_channel(audio_buf, frames, fft_size, 0, 0, HEIGHT / 2, fg); // left
-    fg = rgb565(0,255,255);
-    draw_fft_channel(audio_buf, frames, fft_size, 1, HEIGHT / 2, HEIGHT / 2, fg); // right
 }
 

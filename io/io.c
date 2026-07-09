@@ -21,10 +21,11 @@ extern uint32_t leds;
 extern uint32_t lookup_moder[];
 extern uint32_t lookup_bsrr[];
 
+__attribute__((section(".itcm"),used))
 void SysTick_Handler(void)
 {
 
-    /*
+/*
 __asm volatile("ldr   r3, =0xE000EF50");
 __asm volatile("movs  r4, #0");
 __asm volatile("str   r4, [r3]");

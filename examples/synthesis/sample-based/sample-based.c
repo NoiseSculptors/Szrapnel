@@ -1,8 +1,5 @@
 
 #include "drums.h"
-#include "delay.h"
-#include "init.h"
-#include "printf.h"
 #include "io.h"
 
 /*
@@ -36,7 +33,7 @@
 
 #define SAMPLE_RATE     384000
 #define BUFFER_MS       25
-#define DELAY_MS        50
+#define DELAY_MS        2
 #define DELAY_SAMPLES   ((SAMPLE_RATE/1000) * DELAY_MS)
 #define Q31(x) ((int32_t)((x) * 2147483647.0f))
 #define LIMIT Q31(0.7f)
@@ -68,8 +65,8 @@ void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
         if (current_sample >= total_samples)
             current_sample = 0;
 
-        q31_t s = drums[current_sample];
-        q31_t dry = s * (1 << shift);
+        int32_t s = drums[current_sample];
+        int32_t dry = (int32_t)(s * (1 << shift));
 
         if (dry > LIMIT) dry = LIMIT;
         if (dry < -LIMIT) dry = -LIMIT;

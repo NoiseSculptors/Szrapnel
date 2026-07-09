@@ -57,9 +57,14 @@ code from AXI memory.
 **AXI memory** is a fast system RAM region, and also the largest contiguous
 region on the chip.
 
-### 2) Build
+### 2) Clone and Build
 
-From your home directory, run:
+Clone:
+
+```bash
+git clone --recurse-submodules https://github.com/NoiseSculptors/Szrapnel
+```
+then build:
 
 ```bash
 cmake -S /path/to/szrapnel -B /path/to/szrapnel/build -G Ninja \

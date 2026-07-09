@@ -6,3 +6,8 @@ add_firmware(
   SRCS additive_ADSR.c
 )
 
+target_link_libraries(additive_ADSR PRIVATE
+    lib::ns_audio
+    m
+)
+

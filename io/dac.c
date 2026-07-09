@@ -115,6 +115,8 @@ static void io_dac_dma_init(void)
 }
 
 // ======= Wait for a free half, fill it, and go idle again =======
+
+__attribute__((section(".itcm"),used))
 static inline void wait_for_free_half(int *idx_out, int32_t **ptr_out)
 {
     for (;;) {
@@ -210,6 +212,7 @@ void audio_config(uint32_t s_freq, uint8_t ch, uint16_t buf_ms)
     io_dac_init();
 }
 
+__attribute__((section(".itcm"),used))
 void IRQ_DMA_STR5_Handler(void)
 {
     uint32_t hisr = *DMA1_HISR;
@@ -227,6 +230,7 @@ void IRQ_DMA_STR5_Handler(void)
     }
 }
 
+__attribute__((section(".itcm"),used))
 void audio_loop_start(){
     for (;;) {
         int idx; int32_t *p;

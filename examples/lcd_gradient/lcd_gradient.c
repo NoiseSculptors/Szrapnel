@@ -6,8 +6,7 @@
 
 static void init_hw(void)
 {
-	init_clock();
-    io_lcd_init();
+    io_init();
     /* adjusting backlight */
     lcd_led_brightness(100);
 }
