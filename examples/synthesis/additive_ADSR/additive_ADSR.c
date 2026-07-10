@@ -15,13 +15,17 @@
 
 #define SAMPLE_RATE     48000
 #define BUFFER_MS       30
-#define N_OSC           2100 
+#define N_OSC           (2112 + (16 * 0))
 #define DELAY_SAMPLES   ((SAMPLE_RATE/1000) * 50) // ms
 #define ENV_ATTACK_MS   1000.0f
 #define ENV_DECAY_MS    1000.0f
 #define ENV_RELEASE_MS  3000.0f
 #define TWO_PI          6.283185307179586f
 #define LUT_SHIFT       19 // 2^13=8192 (our LUT size), 32-13=19
+
+#if (N_OSC % 16) != 0
+#error "N_OSC must be divisible by 16"
+#endif
 
 extern float sin_lut[SINE_LUT_SIZE] __attribute__((section(".dtcm_bss")));
 int32_t delay_buf[DELAY_SAMPLES] __attribute__((section(".dtcm_bss")));
@@ -103,18 +107,19 @@ __attribute__((section(".itcm"),used))
 void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
 {
     const float out_gain = 1.0f / (float)N_OSC;
-    const uint32_t am_inc = (uint32_t)(4.0f * (4294967296.0f / (float)SAMPLE_RATE)); /* AM rate Hz */
+    const uint32_t lfo_inc =
+      (uint32_t)(4.0f * (4294967296.0f / (float)SAMPLE_RATE)); /* LFO rate Hz */
 
-    static uint32_t am_phase = 0;
+    static uint32_t lfo_phase = 0;
 
     uint32_t dp = delay_pos;
 
     for (uint32_t i = 0; i < samples_in_buffer; i += 2)
     {
-        const float * lut = sin_lut;
         const float e = adsr_next();
-        uint32_t * ic = incs;
-        uint32_t * ph = phase;
+        const float * restrict lut = sin_lut;
+        uint32_t * restrict ic = incs;
+        uint32_t * restrict ph = phase;
 
         float a0=0.0f;
         float a1=0.0f;
@@ -192,17 +197,10 @@ void audio_feed(int32_t *audio_buffer, uint32_t samples_in_buffer)
         float s = (a0 + a1) + (a2 + a3) + (a4 + a5) + (a6 + a7) +
                   (a8 + a9) + (a10 + a11) + (a12 + a13) + (a14 + a15);
 
-        for (; o < N_OSC; o++)
-        {
-            uint32_t p = ph[o] + ic[o];
-            ph[o] = p;
-            s += lut[p >> LUT_SHIFT];
-        }
+        lfo_phase += lfo_inc;
+        const float lfo = 0.65f + 0.35f * lut[lfo_phase >> LUT_SHIFT]; /* 0.3 .. 1.0 */
 
-        am_phase += am_inc;
-        const float am = 0.65f + 0.35f * lut[am_phase >> LUT_SHIFT]; /* 0.3 .. 1.0 */
-
-        s *= (e * out_gain * am);
+        s *= (e * out_gain * lfo);
 
         if (s > 0.999f) s = 0.999f;
         if (s < -0.999f) s = -0.999f;

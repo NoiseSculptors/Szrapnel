@@ -89,6 +89,6 @@ inline float map_u32_to_01(uint32_t value, uint32_t high, uint32_t low)
     if (value>=high) return 0.0f;
     if (value<=low)  return 1.0f;
 
-    return (float)(high-value)/(float)(high-low);
+    return (high - value) * (1.0f / (float)(high - low));
 }
 

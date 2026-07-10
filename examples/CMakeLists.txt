@@ -20,5 +20,6 @@ add_subdirectory(serial)
 add_subdirectory(synthesis)
 
 add_subdirectory(drivers)
+add_subdirectory(games)
 add_subdirectory(test)
 

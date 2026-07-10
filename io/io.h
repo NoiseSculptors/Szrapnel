@@ -55,9 +55,16 @@ uint16_t rgb565(uint8_t r, uint8_t g, uint8_t b);
 int lcd_printf(int x, int y, int xmul, int ymul,
                uint16_t text_color,
                uint16_t bg_color, const char *fmt, ...);
-void lcd_pixel(uint8_t x, uint8_t y, uint16_t color);
 void lcd_clear(uint16_t color);
 uint16_t *lcd_get_fb(void);
+void lcd_pixel(int x, int y, uint16_t c);
+void lcd_hline(int x0, int x1, int y, uint16_t c);
+void lcd_vline(int x, int y0, int y1, uint16_t c);
+void lcd_line(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, uint16_t c);
+void lcd_box_filled(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, uint16_t c);
+void lcd_box(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, uint16_t c);
+void lcd_circle(uint8_t x0, uint8_t y0, uint8_t r, uint16_t c);
+void lcd_circle_filled(uint8_t x0, uint8_t y0, uint8_t r, uint16_t c);
 
 void fb_to_leds(uint8_t *fb);
 void led_on(uint8_t led);

@@ -29,7 +29,7 @@ extern uint8_t font_8x8_linux[256*8];
 __attribute__((section(".itcm"),used))
 uint16_t *lcd_get_fb(void)
 {
-    return fb;
+    return &fb[0];
 }
 
 __attribute__((section(".itcm"),used))
@@ -329,12 +329,6 @@ int lcd_printf(int x, int y, int xmul, int ymul,
 }
 
 __attribute__((section(".itcm"),used))
-void lcd_pixel(uint8_t x, uint8_t y, uint16_t color)
-{
-	fb[(y*WIDTH)+x] = color;
-}
-
-__attribute__((section(".itcm"),used))
 void lcd_clear(uint16_t color)
 {
     for(int i=0;i<WIDTH*HEIGHT;i++)
@@ -395,5 +389,101 @@ inline void lcd_draw_waveform(
         fp_index += fp_step;
     }
 
+}
+
+inline void lcd_pixel(int x, int y, uint16_t c)
+{
+    fb[(uint32_t)y * WIDTH + (uint32_t)x] = c;
+}
+
+inline void lcd_hline(int x0, int x1, int y, uint16_t c)
+{
+    uint16_t *q = &fb[(uint32_t)y * WIDTH + (uint32_t)x0];
+    if (((x1 - x0) & 1) == 0) {
+        *q++ = c;
+        ++x0;
+    }
+    uint32_t cc = ((uint32_t)c << 16) | c;
+    uint32_t *p32 = (uint32_t *)q;
+    for (; x0 + 1 <= x1; x0 += 2) *p32++ = cc;
+    if (x0 <= x1) *(uint16_t *)p32 = c;
+}
+
+inline void lcd_vline(int x, int y0, int y1, uint16_t c)
+{
+    uint16_t *q = &fb[(uint32_t)y0 * WIDTH + (uint32_t)x];
+    for (; y0 <= y1; ++y0, q += WIDTH) *q = c;
+}
+
+void lcd_line(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, uint16_t c)
+{
+    int x = x0, y = y0, xe = x1, ye = y1;
+    int dx = xe - x, sx = (x < xe) ? 1 : -1;
+    int dy = -(ye - y), sy = (y < ye) ? 1 : -1;
+    int e = dx + dy;
+
+    for (;;) {
+        lcd_pixel(x, y, c);
+        if (x == xe && y == ye) break;
+        int e2 = e << 1;
+        if (e2 >= dy) { e += dy; x += sx; }
+        if (e2 <= dx) { e += dx; y += sy; }
+    }
+}
+
+void lcd_box_filled(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, uint16_t c)
+{
+    if (x0 > x1) { uint8_t t = x0; x0 = x1; x1 = t; }
+    if (y0 > y1) { uint8_t t = y0; y0 = y1; y1 = t; }
+
+    uint32_t cc = ((uint32_t)c << 16) | c;
+    uint16_t *row = &fb[(uint32_t)y0 * WIDTH + (uint32_t)x0];
+    int w = (int)x1 - (int)x0 + 1;
+
+    for (; y0 <= y1; ++y0, row += WIDTH) {
+        uint32_t *p32 = (uint32_t *)row;
+        int n2 = w >> 1;
+        for (int i = 0; i < n2; ++i) *p32++ = cc;
+        if (w & 1) *(uint16_t *)p32 = c;
+    }
+}
+
+void lcd_box(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, uint16_t c)
+{
+    if (x0 > x1) { uint8_t t = x0; x0 = x1; x1 = t; }
+    if (y0 > y1) { uint8_t t = y0; y0 = y1; y1 = t; }
+
+    lcd_hline(x0, x1, y0, c);
+    lcd_hline(x0, x1, y1, c);
+    lcd_vline(x0, y0, y1, c);
+    lcd_vline(x1, y0, y1, c);
+}
+
+void lcd_circle(uint8_t x0, uint8_t y0, uint8_t r, uint16_t c)
+{
+    int xc = x0, yc = y0, x = r, y = 0, e = 1 - x;
+    while (x >= y) {
+        lcd_pixel(xc + x, yc + y, c); lcd_pixel(xc + y, yc + x, c);
+        lcd_pixel(xc - y, yc + x, c); lcd_pixel(xc - x, yc + y, c);
+        lcd_pixel(xc - x, yc - y, c); lcd_pixel(xc - y, yc - x, c);
+        lcd_pixel(xc + y, yc - x, c); lcd_pixel(xc + x, yc - y, c);
+        ++y;
+        if (e < 0) e += (y << 1) + 1;
+        else { --x; e += ((y - x) << 1) + 1; }
+    }
+}
+
+void lcd_circle_filled(uint8_t x0, uint8_t y0, uint8_t r, uint16_t c)
+{
+    int xc = x0, yc = y0, x = r, y = 0, e = 1 - x;
+    while (x >= y) {
+        lcd_hline(xc - x, xc + x, yc + y, c);
+        lcd_hline(xc - x, xc + x, yc - y, c);
+        lcd_hline(xc - y, xc + y, yc + x, c);
+        lcd_hline(xc - y, xc + y, yc - x, c);
+        ++y;
+        if (e < 0) e += (y << 1) + 1;
+        else { --x; e += ((y - x) << 1) + 1; }
+    }
 }
 
