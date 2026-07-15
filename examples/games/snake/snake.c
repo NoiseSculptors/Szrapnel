@@ -4,9 +4,13 @@
 #include "io.h"
 #include "memory.h"
 #include <stdint.h>
+#include <stdbool.h>
+#include <math.h>
 
 #define YELLOW   rgb565(255,255,0)
 #define BLUE     rgb565(0,0,127)
+#define SAMPLE_RATE    384000
+#define BUFFER_MS      25
 
 // Size of one "cell" on the screen (in pixels)
 #define CELL_SIZE   8
@@ -44,6 +48,84 @@ static Point     apple;
 static int       game_over;
 static int       score;
 
+
+static float    sfx_phase;
+static uint32_t sfx_sample;
+static uint32_t sfx_note;
+static int      sfx_active;
+uint32_t        game_delay;
+
+static float sfx_freq[3];
+
+void randomize_sfx(void)
+{
+    static const float semitone_ratio[12] = {
+        1.000000000f, 1.059463094f, 1.122462048f,
+        1.189207115f, 1.259921050f, 1.334839854f,
+        1.414213562f, 1.498307077f, 1.587401052f,
+        1.681792831f, 1.781797436f, 1.887748625f
+    };
+
+    const uint32_t base_fq = 523.251130f;
+    const uint32_t note0 = (rng_rnd() % 12u);
+    const uint32_t note1 = (rng_rnd() % 12u);
+    const uint32_t note2 = (rng_rnd() % 12u);
+
+    sfx_freq[0] = base_fq * semitone_ratio[note0 % 12u] * (float)(1u << (note0 / 12u));
+    sfx_freq[1] = base_fq * semitone_ratio[note1 % 12u] * (float)(1u << (note1 / 12u));
+    sfx_freq[2] = base_fq * semitone_ratio[note2 % 12u] * (float)(1u << (note2 / 12u));
+}
+
+static const uint32_t sfx_length[] = {
+    (SAMPLE_RATE * 50u) / 1000u,
+    (SAMPLE_RATE * 50u) / 1000u,
+    (SAMPLE_RATE * 100u) / 1000u
+};
+
+static inline void sfx_trigger(void)
+{
+    sfx_phase  = 0.0f;
+    sfx_sample = 0u;
+    sfx_note   = 0u;
+    sfx_active = 1;
+}
+
+void audio_feed(int32_t *restrict snd_buf, uint32_t samples)
+{
+    static const float two_pi = 6.2831853071795864769f;
+
+    for (uint32_t i = 0u; i < samples; i+=2) {
+        float sample = 0.0f;
+
+        if (sfx_active) {
+            const uint32_t note_len = sfx_length[sfx_note];
+            const float progress = (float)sfx_sample / (float)note_len;
+            const float envelope = 0.24f * (1.0f - progress);
+            const float phase_incr = sfx_freq[sfx_note] / (float)SAMPLE_RATE;
+
+            sample = sinf(sfx_phase * two_pi) * envelope;
+
+            sfx_phase += phase_incr;
+            if (sfx_phase >= 1.0f) {
+                sfx_phase -= 1.0f;
+            }
+
+            ++sfx_sample;
+            if (sfx_sample >= note_len) {
+                sfx_sample = 0u;
+                ++sfx_note;
+
+                if (sfx_note >= (uint32_t)(sizeof(sfx_freq) /
+                                           sizeof(sfx_freq[0]))) {
+                    sfx_active = 0;
+                }
+            }
+        }
+
+        snd_buf[i+0] = snd_buf[i+1] = (int32_t)(sample * 2147483647.0f);
+    }
+}
+
 static void place_apple(void)
 {
     while (1) {
@@ -67,6 +149,7 @@ static void place_apple(void)
 
 static void game_init(void)
 {
+    game_delay = 80000;
     // Start with a 3-block snake in the middle of the grid
     snake_length = 3;
     snake[0].x = GRID_W / 2;
@@ -85,30 +168,23 @@ static void game_init(void)
 
 static void handle_input(void)
 {
-    static int prev_btn0 = 0;
-    static int prev_btn1 = 0;
+    int btn_up    = button(22);
+    int btn_left  = button(27);
+    int btn_down  = button(28);
+    int btn_right = button(29);
 
-    int btn0 = button(28); // LEFT
-    int btn1 = button(29); // RIGHT
+    static Direction prev_dir;
 
-    // NOTE: if buttons are active-low, just invert:
-    // int pressed0 = !btn0; int pressed1 = !btn1;
-    // For now we assume "1 = pressed"
-    int pressed0 = btn0;
-    int pressed1 = btn1;
+    if(btn_up && (prev_dir != DIR_DOWN))
+        dir = DIR_UP;
+    if(btn_down && (prev_dir != DIR_UP))
+        dir = DIR_DOWN;
+    if(btn_left && (prev_dir != DIR_RIGHT))
+        dir = DIR_LEFT;
+    if(btn_right && (prev_dir != DIR_LEFT))
+        dir = DIR_RIGHT;
 
-    // On rising edge: just pressed now (was 0, now 1)
-    if (pressed0 && !prev_btn0) {
-        // turn left: dir - 1 (mod 4)
-        dir = (Direction)((dir + 3) & 3);
-    }
-    if (pressed1 && !prev_btn1) {
-        // turn right: dir + 1 (mod 4)
-        dir = (Direction)((dir + 1) & 3);
-    }
-
-    prev_btn0 = pressed0;
-    prev_btn1 = pressed1;
+    prev_dir = dir;
 }
 
 static void game_step(void)
@@ -165,6 +241,9 @@ static void game_step(void)
             snake_length++;
         }
         score++;
+        randomize_sfx();
+        sfx_trigger();
+        game_delay -= 2000;
 
         // flash a LED when eating
         for(int i=0;i<6;i++){
@@ -185,8 +264,8 @@ static void game_update(void)
     handle_input(); // turn left/right as soon as button is pressed
 
     if (game_over) {
-        if(button(28)|button(29)){
-            game_over=1;
+        if(button(28)|button(29)|button(27)|button(22)){
+            game_over=0;
             game_init();    
         }
         return;
@@ -258,16 +337,22 @@ static void game_draw(void)
 int main(void){
 
     io_init();
+    audio_config(SAMPLE_RATE, STEREO, BUFFER_MS);
     game_init();
+
+    uint32_t game_ticks = 0;
 
     for (;;){
 
-        lcd_clear(BLUE);
-        game_update();
-        game_draw();
-        lcd_flush_fb();
+        audio_service();
 
-        delay_ms(GAME_TICK_MS);
+        if(game_ticks++ == game_delay){
+            lcd_clear(BLUE);
+            game_update();
+            game_draw();
+            lcd_flush_fb();
+            game_ticks = 0;
+        }
     }
 
     return 0;

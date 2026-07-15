@@ -26,7 +26,8 @@ struct audio_cfg {
 float get_sample_rate(void);
 struct audio_cfg* get_audio_cfg(void);
 void audio_loop_start(void);
-void audio_config(uint32_t s_freq, uint8_t ch, uint16_t buf_ms);
+void audio_service(void);
+uint32_t audio_config(uint32_t s_freq, uint8_t ch, uint16_t buf_ms);
 
 __attribute__((weak))
 void audio_feed(int32_t *dst_interleaved_lr, uint32_t frames);

@@ -11,6 +11,7 @@
 #include "rcc.h"
 #include "rng.h"
 #include "spi_i2s.h"
+#include <stdbool.h>
 
 /* PCM5102A is connected to:
      A4  I2S1_WS
@@ -117,7 +118,8 @@ static void io_dac_dma_init(void)
 // ======= Wait for a free half, fill it, and go idle again =======
 
 __attribute__((section(".itcm"),used))
-static inline void wait_for_free_half(int *idx_out, int32_t **ptr_out)
+static inline void wait_for_free_half(int *restrict idx_out,
+                                      int32_t **restrict ptr_out)
 {
     for (;;) {
         if (free0){
@@ -190,7 +192,7 @@ static void io_dac_init(void)
 
 }
 
-void audio_config(uint32_t s_freq, uint8_t ch, uint16_t buf_ms)
+uint32_t audio_config(uint32_t s_freq, uint8_t ch, uint16_t buf_ms)
 {
     switch (s_freq) {
         case  16000:
@@ -210,6 +212,8 @@ void audio_config(uint32_t s_freq, uint8_t ch, uint16_t buf_ms)
     cfg.samples = (cfg.sample_rate / 1000) * buf_ms * cfg.channels;
 
     io_dac_init();
+
+    return cfg.samples;
 }
 
 __attribute__((section(".itcm"),used))
@@ -237,6 +241,51 @@ void audio_loop_start(){
         wait_for_free_half(&idx, &p);
         audio_feed(p, cfg.samples);
         if (idx == 0) free0 = 0; else free1 = 0;
+    }
+}
+
+
+__attribute__((section(".itcm"),used))
+static inline bool try_get_free_half(int *restrict idx_out,
+                                     int32_t **restrict ptr_out)
+{
+    uint32_t expected;
+
+    expected = 1u;
+    if (__atomic_compare_exchange_n(&free0,
+                                    &expected,
+                                    0u,
+                                    false,
+                                    __ATOMIC_ACQUIRE,
+                                    __ATOMIC_RELAXED)) {
+        *idx_out = 0;
+        *ptr_out = dma_buf0;
+        return true;
+    }
+
+    expected = 1u;
+    if (__atomic_compare_exchange_n(&free1,
+                                    &expected,
+                                    0u,
+                                    false,
+                                    __ATOMIC_ACQUIRE,
+                                    __ATOMIC_RELAXED)) {
+        *idx_out = 1;
+        *ptr_out = dma_buf1;
+        return true;
+    }
+
+    return false;
+}
+
+__attribute__((section(".itcm"),used))
+void audio_service(void)
+{
+    int idx;
+    int32_t *p;
+
+    if (try_get_free_half(&idx, &p)) {
+        audio_feed(p, cfg.samples);
     }
 }
 
