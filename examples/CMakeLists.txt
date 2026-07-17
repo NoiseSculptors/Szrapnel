@@ -1,6 +1,7 @@
 
 cmake_minimum_required(VERSION 3.19)
 
+add_subdirectory(DAC_compare_sample_rate)
 add_subdirectory(DAC_simple_fft)
 add_subdirectory(DAC_simple_noise)
 add_subdirectory(DAC_simple_saw)

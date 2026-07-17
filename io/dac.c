@@ -140,8 +140,6 @@ static void io_dac_init(void)
 {
     pll_2_start(PLLSRC_HSE, 16, 181, 3968, 1, 128, 128, 26000000u);
 
-    delay_ms(1);
-
     /* start gpiox clocks */
     *RCC_AHB4ENR |= (1<<GPIOAEN);
 

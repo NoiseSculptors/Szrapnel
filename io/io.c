@@ -91,6 +91,7 @@ void io_init(void) {
     io_buttons_init();
     io_encoders_init();
     io_serial_init();
+    /* io_dac_init() is started with audio_config */
     io_lcd_init();
 }
 

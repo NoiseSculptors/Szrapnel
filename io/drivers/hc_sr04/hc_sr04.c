@@ -34,6 +34,7 @@ void io_hc_sr04_init(void)
     *TIM1_SMCR  = (6<<4)|(4<<0);
     *TIM1_CCER  = (1<<4)|(3<<0);
     *TIM1_CR1   = 1;
+
 }
 
 
