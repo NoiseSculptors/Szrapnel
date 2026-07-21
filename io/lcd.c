@@ -36,10 +36,10 @@ __attribute__((section(".itcm"),used))
 void lcd_flush_fb(void)
 {
     ramwr[0] = 0x2c;
-    *GPIOD_BSRR = 0x2000000; // CS low - sending command
+    *GPIOD_BSRR = 0x2000000; // DC low - sending command
     lcd_dma_send(ramwr, 1);    // sending one byte - ramwr
     delay_us(10);
-    *GPIOD_BSRR = 0x200;     // CS high - sending data
+    *GPIOD_BSRR = 0x200;     // DC high - sending data
     lcd_dma_send((uint8_t*)fb, 25600);
     delay_ms(2);
 }
@@ -47,12 +47,19 @@ void lcd_flush_fb(void)
 __attribute__((section(".itcm"),used))
 void lcd_flush_fb_async(void)
 {
-    ramwr[0] = 0x2c;
-    *GPIOD_BSRR = 0x2000000; // CS low - sending command
-    lcd_dma_send(ramwr, 1);    // sending one byte - ramwr
-    delay_us(1);
-    *GPIOD_BSRR = 0x200;     // CS high - sending data
-    lcd_dma_send((uint8_t*)fb, 25600);
+    static uint8_t send_command = 1;
+    if(!(*DMA1_LISR & (1<<5))) // TCIF0
+        return;
+    if(send_command){
+        ramwr[0] = 0x2c;
+        *GPIOD_BSRR = 0x2000000; // DC low - sending command
+        lcd_dma_send(ramwr, 1);    // sending one byte - ramwr
+        send_command = 0;
+    } else {
+        *GPIOD_BSRR = 0x200;     // DC high - sending data
+        lcd_dma_send((uint8_t*)fb, 25600);
+        send_command = 1;
+    }
 }
 
 __attribute__((section(".itcm"),used))
